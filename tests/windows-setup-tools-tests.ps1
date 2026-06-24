@@ -1,0 +1,256 @@
+$ErrorActionPreference = "Stop"
+
+if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
+  Write-Host "skipped: Windows setup-tools tests require Windows command resolution"
+  exit 0
+}
+
+$RootDir = Resolve-Path (Join-Path $PSScriptRoot "..")
+$SetupScript = Join-Path $RootDir "windows.ps1"
+$TestRoots = @()
+
+function Fail {
+  param([string]$Message)
+  throw $Message
+}
+
+function Assert-Contains {
+  param(
+    [string]$Text,
+    [string]$Needle,
+    [string]$Label
+  )
+
+  if (-not $Text.Contains($Needle)) {
+    Write-Error "Expected to find: $Needle`nIn text:`n$Text"
+    Fail $Label
+  }
+}
+
+function Assert-NotContains {
+  param(
+    [string]$Text,
+    [string]$Needle,
+    [string]$Label
+  )
+
+  if ($Text.Contains($Needle)) {
+    Write-Error "Did not expect to find: $Needle`nIn text:`n$Text"
+    Fail $Label
+  }
+}
+
+function Assert-LogContains {
+  param(
+    [string]$LogPath,
+    [string]$Needle,
+    [string]$Label
+  )
+
+  if (-not (Test-Path $LogPath)) {
+    Fail "command log does not exist: $LogPath"
+  }
+
+  $log = Get-Content -Raw -Path $LogPath
+  Assert-Contains $log $Needle $Label
+}
+
+function Assert-LogNotContains {
+  param(
+    [string]$LogPath,
+    [string]$Needle,
+    [string]$Label
+  )
+
+  if ((Test-Path $LogPath) -and (Get-Content -Raw -Path $LogPath).Contains($Needle)) {
+    Write-Error "Did not expect command log to contain: $Needle`nIn log:`n$(Get-Content -Raw -Path $LogPath)"
+    Fail $Label
+  }
+}
+
+function New-TestContext {
+  param([string]$Name)
+
+  $root = Join-Path ([System.IO.Path]::GetTempPath()) "setup-tools-$Name-$([guid]::NewGuid().ToString("N"))"
+  $bin = Join-Path $root "bin"
+  New-Item -ItemType Directory -Force -Path $bin | Out-Null
+  $script:TestRoots += $root
+
+  [pscustomobject]@{
+    Root = $root
+    Bin = $bin
+    Log = Join-Path $root "commands.log"
+    Paths = @($bin, (Join-Path $env:SystemRoot "System32"))
+  }
+}
+
+function Write-CmdFile {
+  param(
+    [string]$Path,
+    [string[]]$Lines
+  )
+
+  Set-Content -Path $Path -Encoding ASCII -Value (@("@echo off") + $Lines)
+}
+
+function Add-FakeTool {
+  param(
+    [string]$Directory,
+    [string]$CommandName
+  )
+
+  Write-CmdFile -Path (Join-Path $Directory "$CommandName.cmd") -Lines @(
+    "echo $CommandName 1.0",
+    "exit /b 0"
+  )
+}
+
+function Add-FakeManager {
+  param(
+    [string]$Directory,
+    [ValidateSet("winget", "scoop", "choco")]
+    [string]$Manager
+  )
+
+  switch ($Manager) {
+    "winget" {
+      Write-CmdFile -Path (Join-Path $Directory "winget.cmd") -Lines @(
+        'echo winget %*>>"%FAKE_COMMAND_LOG%"',
+        'if /I "%1"=="list" echo %*',
+        'exit /b 0'
+      )
+    }
+    "scoop" {
+      Write-CmdFile -Path (Join-Path $Directory "scoop.cmd") -Lines @(
+        'echo scoop %*>>"%FAKE_COMMAND_LOG%"',
+        'exit /b 0'
+      )
+    }
+    "choco" {
+      Write-CmdFile -Path (Join-Path $Directory "choco.cmd") -Lines @(
+        'echo choco %*>>"%FAKE_COMMAND_LOG%"',
+        'if /I "%1"=="list" echo ripgrep^|1.0',
+        'exit /b 0'
+      )
+    }
+  }
+}
+
+function Invoke-Setup {
+  param(
+    [pscustomobject]$Context,
+    [string[]]$Arguments,
+    [string[]]$ExtraPaths = @()
+  )
+
+  $oldPath = $env:Path
+  $oldLog = $env:FAKE_COMMAND_LOG
+
+  try {
+    $env:Path = (($ExtraPaths + $Context.Paths) -join [System.IO.Path]::PathSeparator)
+    $env:FAKE_COMMAND_LOG = $Context.Log
+    (& $SetupScript @Arguments 2>&1 | Out-String)
+  } finally {
+    $env:Path = $oldPath
+    $env:FAKE_COMMAND_LOG = $oldLog
+  }
+}
+
+function Run-Test {
+  param(
+    [string]$Name,
+    [scriptblock]$Body
+  )
+
+  Write-Host "test: $Name"
+  & $Body
+  Write-Host "ok: $Name"
+}
+
+try {
+  Run-Test "Windows check-only does not install" {
+    $ctx = New-TestContext "check-only"
+    Add-FakeManager $ctx.Bin "winget"
+
+    $output = Invoke-Setup $ctx @("-CheckOnly")
+
+    Assert-Contains $output "Detected package managers: winget" "Windows should detect fake winget"
+    Assert-Contains $output "[missing] ripgrep" "Windows should report missing tools"
+    Assert-NotContains $output "Installing " "Windows check-only should not print installs"
+    Assert-LogNotContains $ctx.Log " install " "Windows check-only should not invoke installs"
+  }
+
+  foreach ($manager in @("winget", "scoop", "choco")) {
+    Run-Test "Windows install-missing uses $manager" {
+      $ctx = New-TestContext "install-$manager"
+      Add-FakeManager $ctx.Bin $manager
+
+      $output = Invoke-Setup $ctx @("-InstallMissing", "-Manager", $manager)
+      Assert-Contains $output "[missing] ripgrep" "Windows should report ripgrep missing for $manager"
+
+      if ($manager -eq "winget") {
+        Assert-LogContains $ctx.Log "winget install --id BurntSushi.ripgrep.MSVC" "Windows should install ripgrep with winget"
+      } elseif ($manager -eq "scoop") {
+        Assert-LogContains $ctx.Log "scoop install ripgrep" "Windows should install ripgrep with Scoop"
+      } else {
+        Assert-LogContains $ctx.Log "choco install ripgrep -y" "Windows should install ripgrep with Chocolatey"
+      }
+    }
+  }
+
+  Run-Test "Windows upgrade-managed uses winget owner" {
+    $ctx = New-TestContext "upgrade-winget"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeTool $ctx.Bin "rg"
+
+    $output = Invoke-Setup $ctx @("-UpgradeManaged")
+
+    Assert-Contains $output "winget:BurntSushi.ripgrep.MSVC" "Windows should report winget ownership"
+    Assert-LogContains $ctx.Log "winget upgrade --id BurntSushi.ripgrep.MSVC" "Windows should upgrade managed winget owner"
+    Assert-LogNotContains $ctx.Log "winget install" "Windows upgrade should not install missing tools"
+  }
+
+  Run-Test "Windows upgrade-managed uses Scoop owner" {
+    $ctx = New-TestContext "upgrade-scoop"
+    $scoopShims = Join-Path $ctx.Root "scoop\shims"
+    New-Item -ItemType Directory -Force -Path $scoopShims | Out-Null
+    Add-FakeManager $ctx.Bin "scoop"
+    Add-FakeTool $scoopShims "rg"
+
+    $output = Invoke-Setup $ctx @("-UpgradeManaged") @($scoopShims)
+
+    Assert-Contains $output "scoop:ripgrep" "Windows should report Scoop ownership"
+    Assert-LogContains $ctx.Log "scoop update ripgrep" "Windows should upgrade managed Scoop owner"
+    Assert-LogNotContains $ctx.Log "scoop install" "Windows upgrade should not install missing tools"
+  }
+
+  Run-Test "Windows upgrade-managed uses Chocolatey owner" {
+    $ctx = New-TestContext "upgrade-choco"
+    $chocoBin = Join-Path $ctx.Root "chocolatey\bin"
+    New-Item -ItemType Directory -Force -Path $chocoBin | Out-Null
+    Add-FakeManager $ctx.Bin "choco"
+    Add-FakeTool $chocoBin "rg"
+
+    $output = Invoke-Setup $ctx @("-UpgradeManaged") @($chocoBin)
+
+    Assert-Contains $output "choco:ripgrep" "Windows should report Chocolatey ownership"
+    Assert-LogContains $ctx.Log "choco upgrade ripgrep -y" "Windows should upgrade managed Chocolatey owner"
+    Assert-LogNotContains $ctx.Log "choco install" "Windows upgrade should not install missing tools"
+  }
+
+  Run-Test "Windows install-missing without manager prints guidance" {
+    $ctx = New-TestContext "no-manager"
+
+    $output = Invoke-Setup $ctx @("-InstallMissing")
+
+    Assert-Contains $output "Detected package managers: none" "Windows should report no package managers"
+    Assert-Contains $output "No supported Windows package manager was found." "Windows should print package-manager guidance"
+    Assert-LogNotContains $ctx.Log " install " "Windows without a manager should not invoke installs"
+  }
+} finally {
+  foreach ($root in $TestRoots) {
+    if (Test-Path $root) {
+      Remove-Item -Recurse -Force -Path $root
+    }
+  }
+}

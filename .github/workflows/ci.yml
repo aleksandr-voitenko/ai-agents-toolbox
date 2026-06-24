@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  shell-smoke:
+    name: Shell smoke (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v shellcheck >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y shellcheck
+          else
+            brew install shellcheck
+          fi
+
+      - name: Validate shell scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n setup-tools.sh
+          bash -n macos.sh
+          bash -n linux.sh
+          shellcheck setup-tools.sh macos.sh linux.sh
+
+      - name: Run Linux check-only smoke
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./linux.sh --check-only
+          ./setup-tools.sh --check-only
+
+      - name: Run macOS check-only smoke
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./macos.sh --check-only
+          ./setup-tools.sh --check-only
+
+  windows-smoke:
+    name: Windows smoke
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse PowerShell script
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\windows.ps1),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+
+      - name: Run Windows help smoke
+        shell: pwsh
+        run: |
+          $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+          & $powershell -NoProfile -ExecutionPolicy Bypass -File .\windows.ps1 -Help
+
+      - name: Run Windows check-only smoke
+        shell: pwsh
+        run: |
+          $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+          $emptyPath = Join-Path $env:RUNNER_TEMP "setup-tools-empty-path"
+          New-Item -ItemType Directory -Force -Path $emptyPath | Out-Null
+          $env:Path = "$emptyPath;$env:SystemRoot\System32"
+          & $powershell -NoProfile -ExecutionPolicy Bypass -File .\windows.ps1 -CheckOnly
+
+  shell-hermetic:
+    name: Hermetic shell tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run fake-manager shell tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/shell-setup-tools-tests.sh
+
+  windows-hermetic:
+    name: Hermetic Windows tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run fake-manager PowerShell tests
+        shell: pwsh
+        run: |
+          .\tests\windows-setup-tools-tests.ps1

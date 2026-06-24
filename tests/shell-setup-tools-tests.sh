@@ -1,0 +1,332 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEST_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TEST_ROOT"' EXIT
+
+fail() {
+  echo "FAIL: $*" >&2
+  exit 1
+}
+
+assert_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local label="$3"
+  if ! grep -Fq "$needle" "$haystack"; then
+    echo "Expected to find: $needle" >&2
+    echo "In output:" >&2
+    cat "$haystack" >&2
+    fail "$label"
+  fi
+}
+
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local label="$3"
+  if grep -Fq "$needle" "$haystack"; then
+    echo "Did not expect to find: $needle" >&2
+    echo "In output:" >&2
+    cat "$haystack" >&2
+    fail "$label"
+  fi
+}
+
+assert_log_contains() {
+  local log_file="$1"
+  local needle="$2"
+  local label="$3"
+  if [ ! -f "$log_file" ] || ! grep -Fq "$needle" "$log_file"; then
+    echo "Expected command log to contain: $needle" >&2
+    if [ -f "$log_file" ]; then
+      cat "$log_file" >&2
+    fi
+    fail "$label"
+  fi
+}
+
+assert_log_not_contains() {
+  local log_file="$1"
+  local needle="$2"
+  local label="$3"
+  if [ -f "$log_file" ] && grep -Fq "$needle" "$log_file"; then
+    echo "Did not expect command log to contain: $needle" >&2
+    cat "$log_file" >&2
+    fail "$label"
+  fi
+}
+
+run_with_path() {
+  local output_file="$1"
+  local path_value="$2"
+  shift 2
+
+  local status
+  set +e
+  PATH="$path_value" "$@" >"$output_file" 2>&1
+  status=$?
+  set -e
+
+  if [ "$status" -ne 0 ]; then
+    cat "$output_file" >&2
+    fail "command failed with status $status: $*"
+  fi
+}
+
+new_case_dir() {
+  local name="$1"
+  local dir="$TEST_ROOT/$name"
+  mkdir -p "$dir/bin"
+  printf '%s\n' "$dir"
+}
+
+link_utility() {
+  local bin_dir="$1"
+  local utility="$2"
+  local utility_path
+  utility_path="$(command -v "$utility" || true)"
+  [ -n "$utility_path" ] || fail "required test utility not found: $utility"
+  ln -s "$utility_path" "$bin_dir/$utility"
+}
+
+write_executable() {
+  local path="$1"
+  shift
+  {
+    printf '#!/bin/sh\n'
+    printf '%s\n' "$@"
+  } >"$path"
+  chmod +x "$path"
+}
+
+add_common_shell_utilities() {
+  local bin_dir="$1"
+  link_utility "$bin_dir" cat
+  link_utility "$bin_dir" head
+  link_utility "$bin_dir" basename
+  link_utility "$bin_dir" cut
+  link_utility "$bin_dir" sed
+  link_utility "$bin_dir" dirname
+  link_utility "$bin_dir" pwd
+  link_utility "$bin_dir" uname
+
+  write_executable "$bin_dir/id" \
+    'if [ "$1" = "-u" ]; then' \
+    '  printf "0\n"' \
+    'else' \
+    '  printf "uid=0(root) gid=0(root) groups=0(root)\n"' \
+    'fi'
+}
+
+add_fake_tool() {
+  local bin_dir="$1"
+  local command_name="$2"
+  write_executable "$bin_dir/$command_name" \
+    "printf '%s version 1.0\n' '$command_name'"
+}
+
+add_fake_linux_manager() {
+  local bin_dir="$1"
+  local manager="$2"
+  case "$manager" in
+    apt)
+      write_executable "$bin_dir/apt-get" \
+        'printf "apt-get %s\n" "$*" >> "$FAKE_COMMAND_LOG"'
+      ;;
+    dnf|pacman|zypper)
+      write_executable "$bin_dir/$manager" \
+        "printf '$manager %s\n' \"\$*\" >> \"\$FAKE_COMMAND_LOG\""
+      ;;
+    *)
+      fail "unsupported fake Linux manager: $manager"
+      ;;
+  esac
+}
+
+add_fake_dpkg_owner() {
+  local bin_dir="$1"
+  local owner="$2"
+  write_executable "$bin_dir/dpkg" \
+    'if [ "$1" = "-S" ]; then' \
+    "  printf '$owner: %s\n' \"\$2\"" \
+    '  exit 0' \
+    'fi' \
+    'exit 1'
+}
+
+add_fake_brew() {
+  local bin_dir="$1"
+  write_executable "$bin_dir/brew" \
+    'printf "brew %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    'case "$1" in' \
+    '  --prefix)' \
+    '    printf "%s\n" "$FAKE_BREW_PREFIX"' \
+    '    ;;' \
+    '  outdated)' \
+    '    printf "%s\n" "$3"' \
+    '    ;;' \
+    'esac'
+}
+
+test_linux_check_only_does_not_install() {
+  local dir bin log output
+  dir="$(new_case_dir linux-check-only)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_linux_manager "$bin" apt
+
+  FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "Detected package manager: apt" "linux should detect fake apt"
+  assert_contains "$output" "[missing] ripgrep" "linux should report missing tools"
+  assert_not_contains "$output" "Installing " "linux check-only should not print installs"
+  assert_log_not_contains "$log" "apt-get install" "linux check-only should not invoke apt-get install"
+}
+
+test_linux_install_missing_uses_selected_managers() {
+  local manager dir bin log output expected
+
+  for manager in apt dnf pacman zypper; do
+    dir="$(new_case_dir "linux-install-$manager")"
+    bin="$dir/bin"
+    log="$dir/commands.log"
+    output="$dir/output.txt"
+    add_common_shell_utilities "$bin"
+    add_fake_linux_manager "$bin" "$manager"
+
+    FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --manager "$manager" --install-missing
+
+    case "$manager" in
+      apt) expected="apt-get install -y ripgrep" ;;
+      dnf) expected="dnf install -y ripgrep" ;;
+      pacman) expected="pacman -S --needed --noconfirm ripgrep" ;;
+      zypper) expected="zypper install -y ripgrep" ;;
+    esac
+    assert_log_contains "$log" "$expected" "linux install should use selected $manager manager"
+  done
+}
+
+test_linux_upgrade_managed_uses_owner_only() {
+  local dir bin log output
+  dir="$(new_case_dir linux-upgrade-managed)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_linux_manager "$bin" apt
+  add_fake_dpkg_owner "$bin" ripgrep
+  add_fake_tool "$bin" rg
+
+  FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --upgrade-managed
+
+  assert_contains "$output" "apt:ripgrep" "linux should report managed apt ownership"
+  assert_log_contains "$log" "apt-get install --only-upgrade -y ripgrep" "linux should upgrade the managed owner"
+  assert_log_not_contains "$log" "apt-get install -y fd-find" "linux upgrade should not install missing tools"
+}
+
+test_linux_install_without_manager_prints_guidance() {
+  local dir bin log output
+  dir="$(new_case_dir linux-no-manager)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+
+  FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --install-missing
+
+  assert_contains "$output" "Detected package manager: none" "linux should report no manager"
+  assert_contains "$output" "No supported Linux package manager was found." "linux should print manager guidance"
+  assert_log_not_contains "$log" "install" "linux without a manager should not invoke installs"
+}
+
+test_macos_check_only_does_not_install() {
+  local dir bin log output prefix
+  dir="$(new_case_dir macos-check-only)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  prefix="$dir/homebrew"
+  mkdir -p "$prefix"
+  add_common_shell_utilities "$bin"
+  add_fake_brew "$bin"
+
+  FAKE_COMMAND_LOG="$log" FAKE_BREW_PREFIX="$prefix" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
+
+  assert_contains "$output" "[missing] ripgrep" "macOS should report missing tools"
+  assert_not_contains "$output" "Installing " "macOS check-only should not print installs"
+  assert_log_not_contains "$log" "brew install" "macOS check-only should not invoke brew install"
+}
+
+test_macos_install_missing_uses_brew() {
+  local dir bin log output prefix
+  dir="$(new_case_dir macos-install)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  prefix="$dir/homebrew"
+  mkdir -p "$prefix"
+  add_common_shell_utilities "$bin"
+  add_fake_brew "$bin"
+
+  FAKE_COMMAND_LOG="$log" FAKE_BREW_PREFIX="$prefix" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh" --install-missing
+
+  assert_log_contains "$log" "brew install ripgrep" "macOS install should use Homebrew when requested"
+}
+
+test_macos_install_without_brew_prints_guidance() {
+  local dir bin log output
+  dir="$(new_case_dir macos-no-brew)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+
+  FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh" --install-missing
+
+  assert_contains "$output" "Homebrew was not found" "macOS should print Homebrew guidance"
+  assert_log_not_contains "$log" "brew install" "macOS without Homebrew should not invoke installs"
+}
+
+test_macos_upgrade_managed_uses_homebrew_owner() {
+  local dir bin log output prefix rg_dir path_value
+  dir="$(new_case_dir macos-upgrade-managed)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  prefix="$dir/homebrew"
+  rg_dir="$prefix/Cellar/ripgrep/1.0/bin"
+  mkdir -p "$rg_dir"
+  add_common_shell_utilities "$bin"
+  add_fake_brew "$bin"
+  add_fake_tool "$rg_dir" rg
+  path_value="$rg_dir:$bin"
+
+  FAKE_COMMAND_LOG="$log" FAKE_BREW_PREFIX="$prefix" run_with_path "$output" "$path_value" /bin/bash "$ROOT_DIR/macos.sh" --upgrade-managed
+
+  assert_contains "$output" "homebrew:ripgrep" "macOS should report Homebrew ownership"
+  assert_log_contains "$log" "brew outdated --quiet ripgrep" "macOS should check Homebrew outdated state"
+  assert_log_contains "$log" "brew upgrade ripgrep" "macOS should upgrade managed Homebrew tool"
+  assert_log_not_contains "$log" "brew install fd" "macOS upgrade should not install missing tools"
+}
+
+run_test() {
+  local name="$1"
+  shift
+  echo "test: $name"
+  "$@"
+  echo "ok: $name"
+}
+
+run_test "linux check-only does not install" test_linux_check_only_does_not_install
+run_test "linux install-missing uses selected managers" test_linux_install_missing_uses_selected_managers
+run_test "linux upgrade-managed uses managed owner only" test_linux_upgrade_managed_uses_owner_only
+run_test "linux install-missing without manager prints guidance" test_linux_install_without_manager_prints_guidance
+run_test "macOS check-only does not install" test_macos_check_only_does_not_install
+run_test "macOS install-missing uses Homebrew" test_macos_install_missing_uses_brew
+run_test "macOS install-missing without Homebrew prints guidance" test_macos_install_without_brew_prints_guidance
+run_test "macOS upgrade-managed uses Homebrew owner" test_macos_upgrade_managed_uses_homebrew_owner

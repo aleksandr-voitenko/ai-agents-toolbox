@@ -1,0 +1,81 @@
+name: Nightly install smoke
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  linux-install-smoke:
+    name: Linux install smoke (${{ matrix.manager }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: ubuntu:24.04
+            manager: apt
+            prepare: apt-get update
+          - image: fedora:latest
+            manager: dnf
+            prepare: dnf -y makecache
+          - image: archlinux:latest
+            manager: pacman
+            prepare: pacman -Sy --noconfirm
+          - image: opensuse/tumbleweed:latest
+            manager: zypper
+            prepare: zypper --non-interactive refresh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install smoke in disposable container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            "${{ matrix.image }}" \
+            bash -lc '
+              set -euo pipefail
+              ${{ matrix.prepare }}
+              ./linux.sh --install-missing --manager "${{ matrix.manager }}"
+              ./linux.sh --check-only | tee /tmp/setup-tools-check.log
+              grep -q "Missing before install: 0" /tmp/setup-tools-check.log
+              grep -q "Version checks failed:  0" /tmp/setup-tools-check.log
+            '
+
+  macos-install-smoke:
+    name: macOS install smoke
+    runs-on: macos-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install missing tools with Homebrew
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./macos.sh --install-missing
+          ./macos.sh --check-only | tee /tmp/setup-tools-check.log
+          grep -q "Missing before install: 0" /tmp/setup-tools-check.log
+          grep -q "Version checks failed:  0" /tmp/setup-tools-check.log
+
+  windows-install-smoke:
+    name: Windows install smoke
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install missing tools with Chocolatey
+        shell: pwsh
+        run: |
+          choco feature disable --name=showDownloadProgress
+          $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+          & $powershell -NoProfile -ExecutionPolicy Bypass -File .\windows.ps1 -InstallMissing -Manager choco
+          & $powershell -NoProfile -ExecutionPolicy Bypass -File .\windows.ps1 -CheckOnly | Tee-Object -FilePath "$env:TEMP\setup-tools-check.log"
+          Select-String -Path "$env:TEMP\setup-tools-check.log" -SimpleMatch "Missing before install: 0"
+          Select-String -Path "$env:TEMP\setup-tools-check.log" -SimpleMatch "Version checks failed:  0"

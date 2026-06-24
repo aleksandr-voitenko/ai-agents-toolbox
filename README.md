@@ -156,6 +156,25 @@ On macOS and Linux, you can use:
 The wrapper dispatches to the OS-specific shell script. On Windows, use the
 PowerShell script directly.
 
+## CI
+
+Pull requests and pushes to `main` run hosted smoke checks on Ubuntu, macOS,
+and Windows. They also run hermetic fake-manager tests that verify install and
+upgrade behavior without touching real package managers.
+
+The nightly install smoke workflow runs the opt-in install path on disposable
+Linux distro containers, macOS with Homebrew, and Windows with Chocolatey.
+
+Run the hermetic tests locally with:
+
+```sh
+bash tests/shell-setup-tools-tests.sh
+```
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File tests/windows-setup-tools-tests.ps1
+```
+
 ## Notes
 
 The source detection is best effort. It is usually reliable for Homebrew,
