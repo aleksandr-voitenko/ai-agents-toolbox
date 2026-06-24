@@ -16,7 +16,7 @@ case "$OS_NAME" in
 Windows detected from a Unix-like shell.
 
 Please run the PowerShell script instead:
-  powershell -ExecutionPolicy Bypass -File scripts\setup-tools\windows.ps1
+  powershell -ExecutionPolicy Bypass -File .\windows.ps1
 MSG
     exit 2
     ;;

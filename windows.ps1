@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 function Show-Help {
   @"
 Usage:
-  powershell -ExecutionPolicy Bypass -File scripts\setup-tools\windows.ps1 [options]
+  powershell -ExecutionPolicy Bypass -File .\windows.ps1 [options]
 
 Options:
   -CheckOnly        Check tools and report status. This is the default.
@@ -290,7 +290,7 @@ Optional:
   Chocolatey  https://chocolatey.org/install
 
 Install one of these package managers, then rerun:
-  powershell -ExecutionPolicy Bypass -File scripts\setup-tools\windows.ps1 -InstallMissing
+  powershell -ExecutionPolicy Bypass -File .\windows.ps1 -InstallMissing
 "@
 }
 

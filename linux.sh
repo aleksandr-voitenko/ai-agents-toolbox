@@ -8,7 +8,7 @@ PREFERRED_MANAGER="auto"
 usage() {
   cat <<'MSG'
 Usage:
-  scripts/setup-tools/linux.sh [options]
+  ./linux.sh [options]
 
 Options:
   --check-only             Check tools and report status. This is the default.

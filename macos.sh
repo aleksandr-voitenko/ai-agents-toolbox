@@ -7,7 +7,7 @@ UPGRADE_MANAGED=0
 usage() {
   cat <<'MSG'
 Usage:
-  scripts/setup-tools/macos.sh [options]
+  ./macos.sh [options]
 
 Options:
   --check-only        Check tools and report status. This is the default.
@@ -157,7 +157,7 @@ Install Homebrew from:
   https://brew.sh/
 
 Then rerun:
-  scripts/setup-tools/macos.sh --install-missing
+  ./macos.sh --install-missing
 MSG
 }
 
