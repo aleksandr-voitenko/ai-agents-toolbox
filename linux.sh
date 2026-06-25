@@ -114,6 +114,16 @@ run_elevated() {
   fi
 }
 
+run_package_command() {
+  # Package managers may prompt or otherwise read stdin; keep them from
+  # consuming the tool list that feeds the main loop.
+  if [ "$1" = "apt-get" ]; then
+    run_elevated env DEBIAN_FRONTEND=noninteractive "$@" </dev/null
+  else
+    run_elevated "$@" </dev/null
+  fi
+}
+
 find_command() {
   local commands="$1"
   local candidate
@@ -135,6 +145,9 @@ version_for() {
       ;;
     pdftotext)
       "$command_name" -v 2>&1 | head -n 1
+      ;;
+    shfmt)
+      "$command_name" -version 2>&1 | head -n 1
       ;;
     *)
       "$command_name" --version 2>&1 | head -n 1
@@ -217,16 +230,16 @@ install_package() {
   echo "Installing $package with $manager..."
   case "$manager" in
     apt)
-      run_elevated apt-get install -y "$package"
+      run_package_command apt-get install -y "$package"
       ;;
     dnf)
-      run_elevated dnf install -y "$package"
+      run_package_command dnf install -y "$package"
       ;;
     pacman)
-      run_elevated pacman -S --needed --noconfirm "$package"
+      run_package_command pacman -S --needed --noconfirm "$package"
       ;;
     zypper)
-      run_elevated zypper install -y "$package"
+      run_package_command zypper install -y "$package"
       ;;
     *)
       echo "Unsupported package manager: $manager" >&2
@@ -243,19 +256,19 @@ upgrade_source() {
   echo "Upgrading $package with $manager..."
   case "$manager" in
     apt)
-      run_elevated apt-get install --only-upgrade -y "$package"
+      run_package_command apt-get install --only-upgrade -y "$package"
       ;;
     rpm)
       if have dnf; then
-        run_elevated dnf upgrade -y "$package"
+        run_package_command dnf upgrade -y "$package"
       elif have zypper; then
-        run_elevated zypper update -y "$package"
+        run_package_command zypper update -y "$package"
       else
         echo "  skip upgrade: rpm package found, but dnf/zypper is unavailable."
       fi
       ;;
     pacman)
-      run_elevated pacman -S --needed --noconfirm "$package"
+      run_package_command pacman -S --needed --noconfirm "$package"
       ;;
   esac
 }

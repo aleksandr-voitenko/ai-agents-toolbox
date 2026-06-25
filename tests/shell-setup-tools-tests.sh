@@ -112,6 +112,7 @@ add_common_shell_utilities() {
   link_utility "$bin_dir" dirname
   link_utility "$bin_dir" pwd
   link_utility "$bin_dir" uname
+  link_utility "$bin_dir" env
 
   write_executable "$bin_dir/id" \
     'if [ "$1" = "-u" ]; then' \
@@ -128,13 +129,24 @@ add_fake_tool() {
     "printf '%s version 1.0\n' '$command_name'"
 }
 
+add_fake_shfmt() {
+  local bin_dir="$1"
+  write_executable "$bin_dir/shfmt" \
+    'if [ "$1" = "-version" ]; then' \
+    '  printf "3.7.0\n"' \
+    '  exit 0' \
+    'fi' \
+    'exit 2'
+}
+
 add_fake_linux_manager() {
   local bin_dir="$1"
   local manager="$2"
   case "$manager" in
     apt)
       write_executable "$bin_dir/apt-get" \
-        'printf "apt-get %s\n" "$*" >> "$FAKE_COMMAND_LOG"'
+        'printf "apt-get %s DEBIAN_FRONTEND=%s\n" "$*" "$DEBIAN_FRONTEND" >> "$FAKE_COMMAND_LOG"' \
+        'read -r _ || true'
       ;;
     dnf|pacman|zypper)
       write_executable "$bin_dir/$manager" \
@@ -189,7 +201,7 @@ test_linux_check_only_does_not_install() {
 }
 
 test_linux_install_missing_uses_selected_managers() {
-  local manager dir bin log output expected
+  local manager dir bin log output expected last_expected
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -202,13 +214,45 @@ test_linux_install_missing_uses_selected_managers() {
     FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --manager "$manager" --install-missing
 
     case "$manager" in
-      apt) expected="apt-get install -y ripgrep" ;;
-      dnf) expected="dnf install -y ripgrep" ;;
-      pacman) expected="pacman -S --needed --noconfirm ripgrep" ;;
-      zypper) expected="zypper install -y ripgrep" ;;
+      apt)
+        expected="apt-get install -y ripgrep"
+        last_expected="apt-get install -y poppler-utils"
+        ;;
+      dnf)
+        expected="dnf install -y ripgrep"
+        last_expected="dnf install -y poppler-utils"
+        ;;
+      pacman)
+        expected="pacman -S --needed --noconfirm ripgrep"
+        last_expected="pacman -S --needed --noconfirm poppler"
+        ;;
+      zypper)
+        expected="zypper install -y ripgrep"
+        last_expected="zypper install -y poppler-tools"
+        ;;
     esac
     assert_log_contains "$log" "$expected" "linux install should use selected $manager manager"
+    assert_log_contains "$log" "$last_expected" "linux install should keep processing tools after $manager invokes a package command"
+    if [ "$manager" = "apt" ]; then
+      assert_log_contains "$log" "DEBIAN_FRONTEND=noninteractive" "apt installs should run noninteractively"
+    fi
   done
+}
+
+test_linux_shfmt_uses_dash_version() {
+  local dir bin output
+  dir="$(new_case_dir linux-shfmt-version)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_shfmt "$bin"
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "[found]   shfmt" "linux should find fake shfmt"
+  assert_contains "$output" "3.7.0" "linux should read shfmt version with -version"
+  assert_contains "$output" "Version checks failed:  0" "linux should not fail shfmt version checks"
+  assert_not_contains "$output" "version check failed" "linux should not report shfmt version failure"
 }
 
 test_linux_upgrade_managed_uses_owner_only() {
@@ -324,6 +368,7 @@ run_test() {
 
 run_test "linux check-only does not install" test_linux_check_only_does_not_install
 run_test "linux install-missing uses selected managers" test_linux_install_missing_uses_selected_managers
+run_test "linux shfmt uses dash-version" test_linux_shfmt_uses_dash_version
 run_test "linux upgrade-managed uses managed owner only" test_linux_upgrade_managed_uses_owner_only
 run_test "linux install-missing without manager prints guidance" test_linux_install_without_manager_prints_guidance
 run_test "macOS check-only does not install" test_macos_check_only_does_not_install
