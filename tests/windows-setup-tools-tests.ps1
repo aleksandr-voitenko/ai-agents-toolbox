@@ -139,7 +139,7 @@ function Add-FakeManager {
 function Invoke-Setup {
   param(
     [pscustomobject]$Context,
-    [string[]]$Arguments,
+    [hashtable]$Parameters = @{},
     [string[]]$ExtraPaths = @()
   )
 
@@ -149,7 +149,7 @@ function Invoke-Setup {
   try {
     $env:Path = (($ExtraPaths + $Context.Paths) -join [System.IO.Path]::PathSeparator)
     $env:FAKE_COMMAND_LOG = $Context.Log
-    (& $SetupScript @Arguments 2>&1 | Out-String)
+    (& $SetupScript @Parameters 2>&1 | Out-String)
   } finally {
     $env:Path = $oldPath
     $env:FAKE_COMMAND_LOG = $oldLog
@@ -172,7 +172,7 @@ try {
     $ctx = New-TestContext "check-only"
     Add-FakeManager $ctx.Bin "winget"
 
-    $output = Invoke-Setup $ctx @("-CheckOnly")
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
 
     Assert-Contains $output "Detected package managers: winget" "Windows should detect fake winget"
     Assert-Contains $output "[missing] ripgrep" "Windows should report missing tools"
@@ -185,7 +185,7 @@ try {
       $ctx = New-TestContext "install-$manager"
       Add-FakeManager $ctx.Bin $manager
 
-      $output = Invoke-Setup $ctx @("-InstallMissing", "-Manager", $manager)
+      $output = Invoke-Setup $ctx @{ InstallMissing = $true; Manager = $manager }
       Assert-Contains $output "[missing] ripgrep" "Windows should report ripgrep missing for $manager"
 
       if ($manager -eq "winget") {
@@ -203,7 +203,7 @@ try {
     Add-FakeManager $ctx.Bin "winget"
     Add-FakeTool $ctx.Bin "rg"
 
-    $output = Invoke-Setup $ctx @("-UpgradeManaged")
+    $output = Invoke-Setup $ctx @{ UpgradeManaged = $true }
 
     Assert-Contains $output "winget:BurntSushi.ripgrep.MSVC" "Windows should report winget ownership"
     Assert-LogContains $ctx.Log "winget upgrade --id BurntSushi.ripgrep.MSVC" "Windows should upgrade managed winget owner"
@@ -217,7 +217,7 @@ try {
     Add-FakeManager $ctx.Bin "scoop"
     Add-FakeTool $scoopShims "rg"
 
-    $output = Invoke-Setup $ctx @("-UpgradeManaged") @($scoopShims)
+    $output = Invoke-Setup $ctx @{ UpgradeManaged = $true } @($scoopShims)
 
     Assert-Contains $output "scoop:ripgrep" "Windows should report Scoop ownership"
     Assert-LogContains $ctx.Log "scoop update ripgrep" "Windows should upgrade managed Scoop owner"
@@ -231,7 +231,7 @@ try {
     Add-FakeManager $ctx.Bin "choco"
     Add-FakeTool $chocoBin "rg"
 
-    $output = Invoke-Setup $ctx @("-UpgradeManaged") @($chocoBin)
+    $output = Invoke-Setup $ctx @{ UpgradeManaged = $true } @($chocoBin)
 
     Assert-Contains $output "choco:ripgrep" "Windows should report Chocolatey ownership"
     Assert-LogContains $ctx.Log "choco upgrade ripgrep -y" "Windows should upgrade managed Chocolatey owner"
@@ -241,7 +241,7 @@ try {
   Run-Test "Windows install-missing without manager prints guidance" {
     $ctx = New-TestContext "no-manager"
 
-    $output = Invoke-Setup $ctx @("-InstallMissing")
+    $output = Invoke-Setup $ctx @{ InstallMissing = $true }
 
     Assert-Contains $output "Detected package managers: none" "Windows should report no package managers"
     Assert-Contains $output "No supported Windows package manager was found." "Windows should print package-manager guidance"
