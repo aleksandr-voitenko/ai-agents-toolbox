@@ -149,7 +149,8 @@ function Invoke-Setup {
   try {
     $env:Path = (($ExtraPaths + $Context.Paths) -join [System.IO.Path]::PathSeparator)
     $env:FAKE_COMMAND_LOG = $Context.Log
-    (& $SetupScript @Parameters 2>&1 | Out-String)
+    # windows.ps1 uses Write-Host for status lines, which PowerShell emits on the information stream.
+    (& $SetupScript @Parameters *>&1 | Out-String)
   } finally {
     $env:Path = $oldPath
     $env:FAKE_COMMAND_LOG = $oldLog
