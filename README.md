@@ -162,8 +162,10 @@ Pull requests and pushes to `main` run hosted smoke checks on Ubuntu, macOS,
 and Windows. They also run hermetic fake-manager tests that verify install and
 upgrade behavior without touching real package managers.
 
-The nightly install smoke workflow runs the opt-in install path on disposable
-Linux distro containers, macOS with Homebrew, and Windows with Chocolatey.
+The install smoke workflow also runs the opt-in install path on disposable
+Linux distro containers, macOS with Homebrew, and Windows with Chocolatey. It
+is enabled for pull requests, pushes, and its nightly schedule while live
+package-manager failures are being debugged.
 
 Run the hermetic tests locally with:
 

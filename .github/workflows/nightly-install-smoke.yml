@@ -1,6 +1,8 @@
 name: Nightly install smoke
 
 on:
+  pull_request:
+  push:
   schedule:
     - cron: "17 4 * * *"
 

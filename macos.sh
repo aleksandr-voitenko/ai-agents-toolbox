@@ -204,8 +204,10 @@ while IFS='|' read -r name commands brew_package; do
 
   actual_command="$(basename "$command_path")"
   source="$(detect_source "$command_path")"
-  if version="$(version_for "$actual_command")" && [ -n "$version" ]; then
-    :
+  if version="$(version_for "$actual_command")"; then
+    if [ -z "$version" ]; then
+      version="version output empty"
+    fi
   elif [ "$name" = "yarn" ] && [ "${source#homebrew:node}" != "$source" ]; then
     version="corepack shim; version is selected per project"
   else

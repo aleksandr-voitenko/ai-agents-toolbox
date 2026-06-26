@@ -105,6 +105,18 @@ function Add-FakeTool {
   )
 }
 
+function Add-FakeEmptyVersionTool {
+  param(
+    [string]$Directory,
+    [string]$CommandName
+  )
+
+  Write-CmdFile -Path (Join-Path $Directory "$CommandName.cmd") -Lines @(
+    'if /I "%1"=="--version" exit /b 0',
+    'exit /b 2'
+  )
+}
+
 function Add-FakeManager {
   param(
     [string]$Directory,
@@ -209,6 +221,19 @@ try {
     Assert-Contains $output "winget:BurntSushi.ripgrep.MSVC" "Windows should report winget ownership"
     Assert-LogContains $ctx.Log "winget upgrade --id BurntSushi.ripgrep.MSVC" "Windows should upgrade managed winget owner"
     Assert-LogNotContains $ctx.Log "winget install" "Windows upgrade should not install missing tools"
+  }
+
+  Run-Test "Windows empty successful version output is not a failure" {
+    $ctx = New-TestContext "empty-version"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeEmptyVersionTool $ctx.Bin "rg"
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
+    Assert-Contains $output "version output empty" "Windows should report empty successful version output"
+    Assert-Contains $output "Version checks failed:  0" "Windows should not fail successful empty version checks"
+    Assert-NotContains $output "version check failed" "Windows should not report successful empty version output as failed"
   }
 
   Run-Test "Windows upgrade-managed uses Scoop owner" {

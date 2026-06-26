@@ -167,15 +167,18 @@ function Get-VersionLine {
     if ($CommandName -like "gswin*c.exe" -or $CommandName -eq "gs.exe" -or $CommandName -eq "gs") {
       $output = & $CommandName --version 2>&1 | Select-Object -First 1
       if ($LASTEXITCODE -ne 0) { return "version check failed" }
+      if ($null -eq $output) { return "" }
       return $output
     }
     if ($CommandName -eq "pdftotext.exe" -or $CommandName -eq "pdftotext") {
       $output = & $CommandName -v 2>&1 | Select-Object -First 1
       if ($LASTEXITCODE -ne 0) { return "version check failed" }
+      if ($null -eq $output) { return "" }
       return $output
     }
     $output = & $CommandName --version 2>&1 | Select-Object -First 1
     if ($LASTEXITCODE -ne 0) { return "version check failed" }
+    if ($null -eq $output) { return "" }
     return $output
   } catch {
     return "version check failed"
@@ -329,6 +332,8 @@ foreach ($tool in $Tools) {
   $version = Get-VersionLine $cmd.Name
   if ($tool.Name -eq "yarn" -and $version -eq "version check failed" -and $source -eq "npm-or-node") {
     $version = "corepack shim; version is selected per project"
+  } elseif ($null -ne $version -and $version.Length -eq 0) {
+    $version = "version output empty"
   } elseif (-not $version -or $version -eq "version check failed") {
     $failedVersionCount++
     $version = "version check failed"

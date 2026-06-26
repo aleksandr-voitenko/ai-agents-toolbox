@@ -23,7 +23,7 @@ This conservative stance is the main project invariant.
 - `linux.sh` detects `apt`, `dnf`, `pacman`, or `zypper`, with optional `--manager`.
 - `windows.ps1` detects `winget`, Scoop, or Chocolatey, with optional `-Manager`.
 - `.github/workflows/ci.yml` runs PR/push smoke checks and hermetic fake-manager tests.
-- `.github/workflows/nightly-install-smoke.yml` runs scheduled real install smoke checks on disposable runners and containers.
+- `.github/workflows/nightly-install-smoke.yml` runs real install smoke checks on disposable runners and containers for PRs, pushes, and the preserved nightly schedule while live package-manager failures are being debugged.
 - `tests/shell-setup-tools-tests.sh` and `tests/windows-setup-tools-tests.ps1` exercise conservative install and upgrade behavior with fake tools and package managers.
 - `README.md`, when present, is the human-facing usage guide. Keep this file focused on durable project context for maintainers and agents.
 
@@ -72,6 +72,6 @@ On macOS, also run:
 ./macos.sh
 ```
 
-The GitHub Actions PR workflow runs hosted check-only smoke tests on Ubuntu, macOS, and Windows. The nightly workflow runs real install smoke checks with Linux `apt`, `dnf`, `pacman`, and `zypper` containers, macOS Homebrew, and Windows Chocolatey. These nightly checks intentionally run outside the normal PR gate because they depend on live package repositories.
+The GitHub Actions PR workflow runs hosted check-only smoke tests on Ubuntu, macOS, and Windows. The install smoke workflow also runs real install checks with Linux `apt`, `dnf`, `pacman`, and `zypper` containers, macOS Homebrew, and Windows Chocolatey on PRs, pushes, and the preserved nightly schedule while live package-manager failures are being debugged.
 
 `shellcheck` and PowerShell validation may require extra local tools. If `pwsh` or Windows is not available, say so in the final response and describe what was statically checked.

@@ -323,8 +323,10 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
 
   actual_command="$(basename "$command_path")"
   source="$(detect_source "$command_path")"
-  if version="$(version_for "$actual_command")" && [ -n "$version" ]; then
-    :
+  if version="$(version_for "$actual_command")"; then
+    if [ -z "$version" ]; then
+      version="version output empty"
+    fi
   elif [ "$name" = "yarn" ] && { [ "$source" = "npm-or-node" ] || [ "${source#apt:node}" != "$source" ] || [ "${source#rpm:node}" != "$source" ] || [ "${source#pacman:node}" != "$source" ]; }; then
     version="corepack shim; version is selected per project"
   else

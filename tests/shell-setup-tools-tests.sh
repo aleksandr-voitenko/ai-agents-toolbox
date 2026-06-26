@@ -129,14 +129,18 @@ add_fake_tool() {
     "printf '%s version 1.0\n' '$command_name'"
 }
 
-add_fake_shfmt() {
+add_fake_empty_version_tool() {
   local bin_dir="$1"
-  write_executable "$bin_dir/shfmt" \
-    'if [ "$1" = "-version" ]; then' \
-    '  printf "3.7.0\n"' \
+  local command_name="$2"
+  write_executable "$bin_dir/$command_name" \
+    'case "$1" in' \
+    '  --version|-version)' \
     '  exit 0' \
-    'fi' \
-    'exit 2'
+    '  ;;' \
+    '  *)' \
+    '  exit 2' \
+    '  ;;' \
+    'esac'
 }
 
 add_fake_linux_manager() {
@@ -239,20 +243,20 @@ test_linux_install_missing_uses_selected_managers() {
   done
 }
 
-test_linux_shfmt_uses_dash_version() {
+test_linux_empty_successful_version_output_is_not_a_failure() {
   local dir bin output
-  dir="$(new_case_dir linux-shfmt-version)"
+  dir="$(new_case_dir linux-empty-version)"
   bin="$dir/bin"
   output="$dir/output.txt"
   add_common_shell_utilities "$bin"
-  add_fake_shfmt "$bin"
+  add_fake_empty_version_tool "$bin" rg
 
   run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
 
-  assert_contains "$output" "[found]   shfmt" "linux should find fake shfmt"
-  assert_contains "$output" "3.7.0" "linux should read shfmt version with -version"
-  assert_contains "$output" "Version checks failed:  0" "linux should not fail shfmt version checks"
-  assert_not_contains "$output" "version check failed" "linux should not report shfmt version failure"
+  assert_contains "$output" "[found]   ripgrep" "linux should find fake ripgrep"
+  assert_contains "$output" "version output empty" "linux should report empty successful version output"
+  assert_contains "$output" "Version checks failed:  0" "linux should not fail successful empty version checks"
+  assert_not_contains "$output" "version check failed" "linux should not report successful empty version output as failed"
 }
 
 test_linux_upgrade_managed_uses_owner_only() {
@@ -336,6 +340,22 @@ test_macos_install_without_brew_prints_guidance() {
   assert_log_not_contains "$log" "brew install" "macOS without Homebrew should not invoke installs"
 }
 
+test_macos_empty_successful_version_output_is_not_a_failure() {
+  local dir bin output
+  dir="$(new_case_dir macos-empty-version)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_empty_version_tool "$bin" rg
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
+
+  assert_contains "$output" "[found]   ripgrep" "macOS should find fake ripgrep"
+  assert_contains "$output" "version output empty" "macOS should report empty successful version output"
+  assert_contains "$output" "Version checks failed:  0" "macOS should not fail successful empty version checks"
+  assert_not_contains "$output" "version check failed" "macOS should not report successful empty version output as failed"
+}
+
 test_macos_upgrade_managed_uses_homebrew_owner() {
   local dir bin log output prefix rg_dir path_value
   dir="$(new_case_dir macos-upgrade-managed)"
@@ -368,10 +388,11 @@ run_test() {
 
 run_test "linux check-only does not install" test_linux_check_only_does_not_install
 run_test "linux install-missing uses selected managers" test_linux_install_missing_uses_selected_managers
-run_test "linux shfmt uses dash-version" test_linux_shfmt_uses_dash_version
+run_test "linux empty successful version output is not a failure" test_linux_empty_successful_version_output_is_not_a_failure
 run_test "linux upgrade-managed uses managed owner only" test_linux_upgrade_managed_uses_owner_only
 run_test "linux install-missing without manager prints guidance" test_linux_install_without_manager_prints_guidance
 run_test "macOS check-only does not install" test_macos_check_only_does_not_install
 run_test "macOS install-missing uses Homebrew" test_macos_install_missing_uses_brew
 run_test "macOS install-missing without Homebrew prints guidance" test_macos_install_without_brew_prints_guidance
+run_test "macOS empty successful version output is not a failure" test_macos_empty_successful_version_output_is_not_a_failure
 run_test "macOS upgrade-managed uses Homebrew owner" test_macos_upgrade_managed_uses_homebrew_owner
