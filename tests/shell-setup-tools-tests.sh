@@ -162,6 +162,17 @@ add_fake_linux_manager() {
   esac
 }
 
+add_fake_rpm_owner() {
+  local bin_dir="$1"
+  local owner="$2"
+  write_executable "$bin_dir/rpm" \
+    'if [ "$1" = "-qf" ]; then' \
+    "  printf '$owner\n'" \
+    '  exit 0' \
+    'fi' \
+    'exit 1'
+}
+
 add_fake_dpkg_owner() {
   local bin_dir="$1"
   local owner="$2"
@@ -180,6 +191,11 @@ add_fake_brew() {
     'case "$1" in' \
     '  --prefix)' \
     '    printf "%s\n" "$FAKE_BREW_PREFIX"' \
+    '    ;;' \
+    '  list)' \
+    '    if [ "$2" = "--versions" ]; then' \
+    '      printf "%s 15.0.0\n" "$3"' \
+    '    fi' \
     '    ;;' \
     '  outdated)' \
     '    printf "%s\n" "$3"' \
@@ -249,13 +265,15 @@ test_linux_empty_successful_version_output_is_not_a_failure() {
   bin="$dir/bin"
   output="$dir/output.txt"
   add_common_shell_utilities "$bin"
+  add_fake_rpm_owner "$bin" "ripgrep-15.0.0-1.fc44.x86_64"
   add_fake_empty_version_tool "$bin" rg
 
   run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
 
   assert_contains "$output" "[found]   ripgrep" "linux should find fake ripgrep"
-  assert_contains "$output" "version output empty" "linux should report empty successful version output"
+  assert_contains "$output" "package version: ripgrep-15.0.0-1.fc44.x86_64" "linux should use package metadata for empty successful version output"
   assert_contains "$output" "Version checks failed:  0" "linux should not fail successful empty version checks"
+  assert_not_contains "$output" "version output empty" "linux should prefer package metadata when it is available"
   assert_not_contains "$output" "version check failed" "linux should not report successful empty version output as failed"
 }
 
@@ -341,18 +359,25 @@ test_macos_install_without_brew_prints_guidance() {
 }
 
 test_macos_empty_successful_version_output_is_not_a_failure() {
-  local dir bin output
+  local dir bin log output prefix rg_dir path_value
   dir="$(new_case_dir macos-empty-version)"
   bin="$dir/bin"
+  log="$dir/commands.log"
   output="$dir/output.txt"
+  prefix="$dir/homebrew"
+  rg_dir="$prefix/Cellar/ripgrep/15.0.0/bin"
+  mkdir -p "$rg_dir"
   add_common_shell_utilities "$bin"
-  add_fake_empty_version_tool "$bin" rg
+  add_fake_brew "$bin"
+  add_fake_empty_version_tool "$rg_dir" rg
+  path_value="$rg_dir:$bin"
 
-  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
+  FAKE_COMMAND_LOG="$log" FAKE_BREW_PREFIX="$prefix" run_with_path "$output" "$path_value" /bin/bash "$ROOT_DIR/macos.sh"
 
   assert_contains "$output" "[found]   ripgrep" "macOS should find fake ripgrep"
-  assert_contains "$output" "version output empty" "macOS should report empty successful version output"
+  assert_contains "$output" "package version: ripgrep 15.0.0" "macOS should use Homebrew metadata for empty successful version output"
   assert_contains "$output" "Version checks failed:  0" "macOS should not fail successful empty version checks"
+  assert_not_contains "$output" "version output empty" "macOS should prefer package metadata when it is available"
   assert_not_contains "$output" "version check failed" "macOS should not report successful empty version output as failed"
 }
 

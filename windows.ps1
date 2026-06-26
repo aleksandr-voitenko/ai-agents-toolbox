@@ -185,6 +185,51 @@ function Get-VersionLine {
   }
 }
 
+function Get-PackageVersionForSource {
+  param([string]$Source)
+
+  $parts = $Source.Split(":", 2)
+  if ($parts.Count -ne 2) {
+    return $null
+  }
+
+  $sourceManager = $parts[0]
+  $package = $parts[1]
+  if (-not $package -or $package -eq "unknown") {
+    return $null
+  }
+
+  try {
+    if ($sourceManager -eq "winget") {
+      $output = winget list --id $package --exact --disable-interactivity 2>$null
+      if ($LASTEXITCODE -ne 0) { return $null }
+      $line = $output | Where-Object { "$_".Trim() -and "$_" -match [regex]::Escape($package) } | Select-Object -First 1
+      if ($line) { return "package version: $("$line".Trim())" }
+      return $null
+    }
+
+    if ($sourceManager -eq "scoop") {
+      $output = scoop list $package 2>$null
+      if ($LASTEXITCODE -ne 0) { return $null }
+      $line = $output | Where-Object { "$_".Trim() -and "$_" -match [regex]::Escape($package) } | Select-Object -First 1
+      if ($line) { return "package version: $("$line".Trim())" }
+      return $null
+    }
+
+    if ($sourceManager -eq "choco") {
+      $output = choco list --local-only --exact $package --limit-output 2>$null
+      if ($LASTEXITCODE -ne 0) { return $null }
+      $line = $output | Where-Object { "$_".Trim() -and "$_" -match "^$([regex]::Escape($package))\|" } | Select-Object -First 1
+      if ($line) { return "package version: $("$line".Trim() -replace '\|', ' ')" }
+      return $null
+    }
+  } catch {
+    return $null
+  }
+
+  return $null
+}
+
 function Get-AvailableManagers {
   $available = @()
   if (Test-CommandExists "winget") { $available += "winget" }
@@ -333,7 +378,12 @@ foreach ($tool in $Tools) {
   if ($tool.Name -eq "yarn" -and $version -eq "version check failed" -and $source -eq "npm-or-node") {
     $version = "corepack shim; version is selected per project"
   } elseif ($null -ne $version -and $version.Length -eq 0) {
-    $version = "version output empty"
+    $packageVersion = Get-PackageVersionForSource $source
+    if ($packageVersion) {
+      $version = $packageVersion
+    } else {
+      $version = "version output empty"
+    }
   } elseif (-not $version -or $version -eq "version check failed") {
     $failedVersionCount++
     $version = "version check failed"

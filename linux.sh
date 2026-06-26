@@ -208,6 +208,46 @@ detect_source() {
   esac
 }
 
+package_version_for_source() {
+  local source="$1"
+  local command_path="$2"
+  local package version
+
+  case "$source" in
+    apt:*)
+      package="${source#apt:}"
+      if have dpkg-query; then
+        version="$(dpkg-query -W -f='${Version}' "$package" 2>/dev/null || true)"
+        if [ -n "$version" ]; then
+          printf 'package version: %s %s' "$package" "$version"
+          return 0
+        fi
+      fi
+      ;;
+    rpm:*)
+      if have rpm; then
+        version="$(rpm -qf --queryformat '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$command_path" 2>/dev/null || true)"
+        if [ -n "$version" ] && [ "${version#file }" = "$version" ]; then
+          printf 'package version: %s' "$version"
+          return 0
+        fi
+      fi
+      ;;
+    pacman:*)
+      package="${source#pacman:}"
+      if have pacman; then
+        version="$(pacman -Q "$package" 2>/dev/null || true)"
+        if [ -n "$version" ]; then
+          printf 'package version: %s' "$version"
+          return 0
+        fi
+      fi
+      ;;
+  esac
+
+  return 1
+}
+
 package_for_manager() {
   local manager="$1"
   local apt_pkg="$2"
@@ -325,7 +365,10 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
   source="$(detect_source "$command_path")"
   if version="$(version_for "$actual_command")"; then
     if [ -z "$version" ]; then
-      version="version output empty"
+      version="$(package_version_for_source "$source" "$command_path" || true)"
+      if [ -z "$version" ]; then
+        version="version output empty"
+      fi
     fi
   elif [ "$name" = "yarn" ] && { [ "$source" = "npm-or-node" ] || [ "${source#apt:node}" != "$source" ] || [ "${source#rpm:node}" != "$source" ] || [ "${source#pacman:node}" != "$source" ]; }; then
     version="corepack shim; version is selected per project"

@@ -128,20 +128,21 @@ function Add-FakeManager {
     "winget" {
       Write-CmdFile -Path (Join-Path $Directory "winget.cmd") -Lines @(
         'echo winget %*>>"%FAKE_COMMAND_LOG%"',
-        'if /I "%1"=="list" echo %*',
+        'if /I "%1"=="list" echo ripgrep BurntSushi.ripgrep.MSVC 15.0.0 winget',
         'exit /b 0'
       )
     }
     "scoop" {
       Write-CmdFile -Path (Join-Path $Directory "scoop.cmd") -Lines @(
         'echo scoop %*>>"%FAKE_COMMAND_LOG%"',
+        'if /I "%1"=="list" echo ripgrep 15.0.0',
         'exit /b 0'
       )
     }
     "choco" {
       Write-CmdFile -Path (Join-Path $Directory "choco.cmd") -Lines @(
         'echo choco %*>>"%FAKE_COMMAND_LOG%"',
-        'if /I "%1"=="list" echo ripgrep^|1.0',
+        'if /I "%1"=="list" echo ripgrep^|15.0.0',
         'exit /b 0'
       )
     }
@@ -231,8 +232,9 @@ try {
     $output = Invoke-Setup $ctx @{ CheckOnly = $true }
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
-    Assert-Contains $output "version output empty" "Windows should report empty successful version output"
+    Assert-Contains $output "package version: ripgrep BurntSushi.ripgrep.MSVC 15.0.0 winget" "Windows should use package metadata for empty successful version output"
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail successful empty version checks"
+    Assert-NotContains $output "version output empty" "Windows should prefer package metadata when it is available"
     Assert-NotContains $output "version check failed" "Windows should not report successful empty version output as failed"
   }
 

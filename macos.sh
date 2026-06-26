@@ -148,6 +148,27 @@ detect_source() {
   esac
 }
 
+package_version_for_source() {
+  local source="$1"
+  local package version
+
+  case "$source" in
+    homebrew:*)
+      package="${source#homebrew:}"
+      if [ "$package" = "unknown" ] || [ -z "$BREW_BIN" ]; then
+        return 1
+      fi
+      version="$(brew list --versions "$package" 2>/dev/null | head -n 1 || true)"
+      if [ -n "$version" ]; then
+        printf 'package version: %s' "$version"
+        return 0
+      fi
+      ;;
+  esac
+
+  return 1
+}
+
 print_brew_guidance() {
   cat <<'MSG'
 
@@ -206,7 +227,10 @@ while IFS='|' read -r name commands brew_package; do
   source="$(detect_source "$command_path")"
   if version="$(version_for "$actual_command")"; then
     if [ -z "$version" ]; then
-      version="version output empty"
+      version="$(package_version_for_source "$source" || true)"
+      if [ -z "$version" ]; then
+        version="version output empty"
+      fi
     fi
   elif [ "$name" = "yarn" ] && [ "${source#homebrew:node}" != "$source" ]; then
     version="corepack shim; version is selected per project"
