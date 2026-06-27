@@ -204,10 +204,25 @@ try {
 
       if ($manager -eq "winget") {
         Assert-LogContains $ctx.Log "winget install --id BurntSushi.ripgrep.MSVC" "Windows should install ripgrep with winget"
+        Assert-LogContains $ctx.Log "winget install --id cURL.cURL" "Windows should install curl with winget"
+        Assert-LogContains $ctx.Log "winget install --id SQLite.SQLite" "Windows should install sqlite3 with winget"
+        Assert-LogContains $ctx.Log "winget install --id MikeFarah.yq" "Windows should install yq with winget"
+        Assert-LogContains $ctx.Log "winget install --id GnuWin32.File" "Windows should install file with winget"
+        Assert-LogNotContains $ctx.Log "winget install --id dandavison" "Windows should not use an unverified delta winget id"
       } elseif ($manager -eq "scoop") {
         Assert-LogContains $ctx.Log "scoop install ripgrep" "Windows should install ripgrep with Scoop"
+        Assert-LogContains $ctx.Log "scoop install curl" "Windows should install curl with Scoop"
+        Assert-LogContains $ctx.Log "scoop install sqlite" "Windows should install sqlite3 with Scoop"
+        Assert-LogContains $ctx.Log "scoop install yq" "Windows should install yq with Scoop"
+        Assert-LogContains $ctx.Log "scoop install delta" "Windows should install git-delta with Scoop"
+        Assert-LogContains $ctx.Log "scoop install file" "Windows should install file with Scoop"
       } else {
         Assert-LogContains $ctx.Log "choco install ripgrep -y" "Windows should install ripgrep with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install curl -y" "Windows should install curl with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install sqlite -y" "Windows should install sqlite3 with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install yq -y" "Windows should install yq with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install delta -y" "Windows should install git-delta with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install file -y" "Windows should install file with Chocolatey"
       }
     }
   }

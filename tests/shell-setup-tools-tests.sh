@@ -221,7 +221,7 @@ test_linux_check_only_does_not_install() {
 }
 
 test_linux_install_missing_uses_selected_managers() {
-  local manager dir bin log output expected last_expected
+  local manager dir bin log output expected expected_sqlite expected_delta expected_file last_expected
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -236,22 +236,37 @@ test_linux_install_missing_uses_selected_managers() {
     case "$manager" in
       apt)
         expected="apt-get install -y ripgrep"
+        expected_sqlite="apt-get install -y sqlite3"
+        expected_delta="apt-get install -y git-delta"
+        expected_file="apt-get install -y file"
         last_expected="apt-get install -y poppler-utils"
         ;;
       dnf)
         expected="dnf install -y ripgrep"
+        expected_sqlite="dnf install -y sqlite"
+        expected_delta="dnf install -y git-delta"
+        expected_file="dnf install -y file"
         last_expected="dnf install -y poppler-utils"
         ;;
       pacman)
         expected="pacman -S --needed --noconfirm ripgrep"
+        expected_sqlite="pacman -S --needed --noconfirm sqlite"
+        expected_delta="pacman -S --needed --noconfirm git-delta"
+        expected_file="pacman -S --needed --noconfirm file"
         last_expected="pacman -S --needed --noconfirm poppler"
         ;;
       zypper)
         expected="zypper install -y ripgrep"
+        expected_sqlite="zypper install -y sqlite3"
+        expected_delta="zypper install -y git-delta"
+        expected_file="zypper install -y file"
         last_expected="zypper install -y poppler-tools"
         ;;
     esac
     assert_log_contains "$log" "$expected" "linux install should use selected $manager manager"
+    assert_log_contains "$log" "$expected_sqlite" "linux install should map sqlite3 for $manager"
+    assert_log_contains "$log" "$expected_delta" "linux install should map git-delta for $manager"
+    assert_log_contains "$log" "$expected_file" "linux install should map file for $manager"
     assert_log_contains "$log" "$last_expected" "linux install should keep processing tools after $manager invokes a package command"
     if [ "$manager" = "apt" ]; then
       assert_log_contains "$log" "DEBIAN_FRONTEND=noninteractive" "apt installs should run noninteractively"

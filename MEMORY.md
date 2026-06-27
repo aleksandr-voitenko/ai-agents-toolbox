@@ -36,7 +36,7 @@ This conservative stance is the main project invariant.
 - Do not install Homebrew, winget, Scoop, Chocolatey, or Linux package managers.
 - Do not silently switch package managers for an already-installed command.
 - Treat source detection as best effort and label uncertain cases honestly.
-- Preserve support for commands whose package name differs from their executable name, such as `ghostscript` -> `gs` and `poppler`/`poppler-utils` -> `pdftotext`.
+- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `libmagic` -> `file`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
 - Be careful with Windows: PATH shims and multi-manager ownership can be messy. Prefer reporting uncertainty over making destructive assumptions.
 
 ## Implementation Guidance

@@ -49,9 +49,13 @@ TOOLS=$(cat <<'EOF'
 ripgrep|rg|ripgrep
 fd|fd|fd
 jq|jq|jq
+curl|curl|curl
+sqlite3|sqlite3|sqlite
+yq|yq|yq
 clang-format|clang-format|clang-format
 gh|gh|gh
 git|git|git
+git-delta|delta|git-delta
 node|node|node
 yarn|yarn|yarn
 python|python3,python|python
@@ -61,6 +65,7 @@ bat|bat|bat
 eza|eza|eza
 fzf|fzf|fzf
 tree|tree|tree
+file|file|libmagic
 hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck
 shfmt|shfmt|shfmt

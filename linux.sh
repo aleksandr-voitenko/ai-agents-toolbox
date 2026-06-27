@@ -60,9 +60,13 @@ TOOLS=$(cat <<'EOF'
 ripgrep|rg|ripgrep|ripgrep|ripgrep|ripgrep
 fd|fd,fdfind|fd-find|fd-find|fd|fd
 jq|jq|jq|jq|jq|jq
+curl|curl|curl|curl|curl|curl
+sqlite3|sqlite3|sqlite3|sqlite|sqlite|sqlite3
+yq|yq|yq|yq|yq|yq
 clang-format|clang-format|clang-format|clang-tools-extra|clang|clang-tools
 gh|gh|gh|gh|github-cli|gh
 git|git|git|git|git|git
+git-delta|delta|git-delta|git-delta|git-delta|git-delta
 node|node,nodejs|nodejs|nodejs|nodejs|nodejs
 yarn|yarn,yarnpkg|yarnpkg|yarnpkg|yarn|yarn
 python|python3,python|python3|python3|python|python3
@@ -72,6 +76,7 @@ bat|bat,batcat|bat|bat|bat|bat
 eza|eza|eza|eza|eza|eza
 fzf|fzf|fzf|fzf|fzf|fzf
 tree|tree|tree|tree|tree|tree
+file|file|file|file|file|file
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck
 shfmt|shfmt|shfmt|shfmt|shfmt|shfmt

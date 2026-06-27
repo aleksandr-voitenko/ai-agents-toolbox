@@ -18,16 +18,18 @@ They are intentionally conservative:
 Core workspace tools:
 
 ```text
-rg fd jq clang-format gh git node yarn python cmake ninja
+rg fd jq curl sqlite3 yq clang-format gh git node yarn python cmake ninja
 ```
 
 Convenience and document tools:
 
 ```text
-bat eza fzf tree hyperfine shellcheck shfmt gs pdftotext
+bat eza fzf tree delta file hyperfine shellcheck shfmt gs pdftotext
 ```
 
 Some tools have different package names than command names. For example,
+`sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
+the `git-delta` package, `file` is installed by Homebrew's `libmagic` package,
 `gs` is installed by the `ghostscript` package, and `pdftotext` is installed by
 the `poppler` or `poppler-utils` package.
 
