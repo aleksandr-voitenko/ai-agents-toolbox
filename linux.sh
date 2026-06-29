@@ -63,6 +63,7 @@ jq|jq|jq|jq|jq|jq
 curl|curl|curl|curl|curl|curl
 sqlite3|sqlite3|sqlite3|sqlite|sqlite|sqlite3
 yq|yq|yq|yq|yq|yq
+actionlint|actionlint|github-release:actionlint|github-release:actionlint|actionlint|github-release:actionlint
 clang-format|clang-format|clang-format|clang-tools-extra|clang|clang-tools
 gh|gh|gh|gh|github-cli|gh
 git|git|git|git|git|git
@@ -293,6 +294,88 @@ install_package() {
   esac
 }
 
+download_to_stdout() {
+  local url="$1"
+  if have curl; then
+    curl -fsSL "$url"
+    return 0
+  fi
+  if have wget; then
+    wget -qO- "$url"
+    return 0
+  fi
+
+  echo "curl or wget is required to download $url" >&2
+  return 1
+}
+
+# Several default Linux repositories used by the install smoke matrix do not
+# package actionlint. Keep the fallback narrow: it only installs missing
+# actionlint from the upstream release and never replaces an existing command.
+actionlint_release_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64)
+      printf 'amd64'
+      ;;
+    aarch64|arm64)
+      printf 'arm64'
+      ;;
+    armv6l|armv6)
+      printf 'armv6'
+      ;;
+    i386|i686)
+      printf '386'
+      ;;
+    *)
+      echo "Unsupported actionlint release architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+install_actionlint_release() {
+  local arch api_url asset_url asset_name asset_version checksum_url tmp_dir status
+
+  arch="$(actionlint_release_arch)"
+  api_url="https://api.github.com/repos/rhysd/actionlint/releases/latest"
+  asset_url="$(download_to_stdout "$api_url" | sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*actionlint_[^\"]*_linux_${arch}\\.tar\\.gz\\)\".*#\\1#p" | head -n 1)"
+  if [ -z "$asset_url" ]; then
+    echo "Could not find an actionlint Linux $arch release asset." >&2
+    return 1
+  fi
+
+  asset_name="${asset_url##*/}"
+  asset_version="${asset_name#actionlint_}"
+  asset_version="${asset_version%%_*}"
+  checksum_url="${asset_url%/*}/actionlint_${asset_version}_checksums.txt"
+  tmp_dir="$(mktemp -d)"
+  status=0
+
+  (
+    set -e
+    cd "$tmp_dir"
+    download_to_stdout "$asset_url" > "$asset_name"
+
+    if have sha256sum; then
+      download_to_stdout "$checksum_url" > checksums.txt
+      checksum_line="$(grep "  $asset_name\$" checksums.txt || true)"
+      if [ -z "$checksum_line" ]; then
+        echo "Could not find checksum for $asset_name." >&2
+        exit 1
+      fi
+      printf '%s\n' "$checksum_line" | sha256sum -c -
+    else
+      echo "sha256sum was not found; skipping actionlint checksum verification." >&2
+    fi
+
+    tar -xzf "$asset_name" actionlint
+    run_elevated install -m 0755 actionlint /usr/local/bin/actionlint
+  ) || status=$?
+
+  rm -rf "$tmp_dir"
+  return "$status"
+}
+
 upgrade_source() {
   local source="$1"
   local manager="${source%%:*}"
@@ -356,8 +439,17 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
 
     if [ -n "$PACKAGE_MANAGER" ]; then
       package="$(package_for_manager "$PACKAGE_MANAGER" "$apt_pkg" "$dnf_pkg" "$pacman_pkg" "$zypper_pkg" || true)"
-      printf ' package: %s\n' "$package"
-      if [ "$INSTALL_MISSING" -eq 1 ]; then
+      if [ "$package" = "github-release:actionlint" ]; then
+        printf ' installer: upstream GitHub release\n'
+      elif [ -n "$package" ]; then
+        printf ' package: %s\n' "$package"
+      else
+        printf ' package: unavailable\n'
+      fi
+
+      if [ "$INSTALL_MISSING" -eq 1 ] && [ "$package" = "github-release:actionlint" ]; then
+        install_actionlint_release
+      elif [ "$INSTALL_MISSING" -eq 1 ] && [ -n "$package" ]; then
         install_package "$PACKAGE_MANAGER" "$package"
       fi
     else

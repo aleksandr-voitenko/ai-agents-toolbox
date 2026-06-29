@@ -1,7 +1,8 @@
 # Developer Tool Setup
 
 These scripts check for the command-line tools used by this workspace and can
-install missing tools through an already-installed package manager.
+install missing tools through an already-installed package manager, with a
+documented Linux fallback for `actionlint` where native packages are unavailable.
 
 ## One-Line Installers
 
@@ -48,7 +49,7 @@ They are intentionally conservative:
 Core workspace tools:
 
 ```text
-rg fd jq curl sqlite3 yq clang-format gh git node yarn python cmake ninja
+rg fd jq curl sqlite3 yq actionlint clang-format gh git node yarn python cmake ninja
 ```
 
 Convenience and document tools:
@@ -61,7 +62,10 @@ Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
 the `git-delta` package, `file` is installed by Homebrew's `libmagic` package,
 `gs` is installed by the `ghostscript` package, and `pdftotext` is installed by
-the `poppler` or `poppler-utils` package.
+the `poppler` or `poppler-utils` package. On Linux, `actionlint` uses the
+native package manager where verified; when the selected distribution repository
+does not provide it, the script installs the official upstream GitHub release to
+`/usr/local/bin`.
 
 ## macOS
 
@@ -134,7 +138,8 @@ distribution and rerun the script.
 
 Linux package availability varies by distribution version. If a package is not
 available from the native repository, the script reports the failure instead of
-switching to a different installation source.
+switching to a different installation source, except for the documented
+`actionlint` upstream release fallback.
 
 ## Windows
 

@@ -37,6 +37,7 @@ $Tools = @(
   @{ Name = "curl"; Commands = @("curl.exe"); Winget = "cURL.cURL"; Scoop = "curl"; Choco = "curl" },
   @{ Name = "sqlite3"; Commands = @("sqlite3.exe", "sqlite3"); Winget = "SQLite.SQLite"; Scoop = "sqlite"; Choco = "sqlite" },
   @{ Name = "yq"; Commands = @("yq.exe", "yq"); Winget = "MikeFarah.yq"; Scoop = "yq"; Choco = "yq" },
+  @{ Name = "actionlint"; Commands = @("actionlint.exe", "actionlint"); Winget = "rhysd.actionlint"; Scoop = "actionlint"; Choco = "actionlint" },
   @{ Name = "clang-format"; Commands = @("clang-format.exe", "clang-format"); Winget = "LLVM.LLVM"; Scoop = "llvm"; Choco = "llvm" },
   @{ Name = "gh"; Commands = @("gh.exe", "gh"); Winget = "GitHub.cli"; Scoop = "gh"; Choco = "gh" },
   @{ Name = "git"; Commands = @("git.exe", "git"); Winget = "Git.Git"; Scoop = "git"; Choco = "git" },

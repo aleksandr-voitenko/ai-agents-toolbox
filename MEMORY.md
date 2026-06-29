@@ -35,6 +35,11 @@ This conservative stance is the main project invariant.
 - Do not add a global "upgrade everything" mode.
 - Do not install Homebrew, winget, Scoop, Chocolatey, or Linux package managers.
 - Do not silently switch package managers for an already-installed command.
+- Keep direct upstream binary installs rare and explicit. The current Linux
+  exception is missing `actionlint` when apt, dnf, or zypper has no verified
+  native package; the script downloads the official GitHub release, verifies the
+  checksum when `sha256sum` is available, and installs it to `/usr/local/bin`
+  without taking over future managed upgrades.
 - Treat source detection as best effort and label uncertain cases honestly.
 - Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `libmagic` -> `file`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
 - Be careful with Windows: PATH shims and multi-manager ownership can be messy. Prefer reporting uncertainty over making destructive assumptions.
@@ -45,6 +50,9 @@ This conservative stance is the main project invariant.
 - Keep OS-specific behavior in the OS-specific script. Avoid forcing a shared runtime or manifest parser unless it is already available on a fresh machine.
 - Prefer clear output over clever output. Users should be able to tell what was found, where it came from, and why an action was skipped.
 - When adding a tool, update all relevant OS scripts and any user-facing documentation that exists.
+- When a tool lacks native package coverage and needs a direct fallback, keep
+  that fallback tool-specific, verify upstream release assets and checksums, and
+  document which package managers use it.
 - If adding a package manager, add it conservatively and include source detection and package-manager guidance. Do not make it the default unless it is widely available and low surprise.
 - If adding version checks, handle commands that return nonzero for `--version`. Do not treat error output as a valid version.
 

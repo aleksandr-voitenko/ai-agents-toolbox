@@ -52,6 +52,7 @@ jq|jq|jq
 curl|curl|curl
 sqlite3|sqlite3|sqlite
 yq|yq|yq
+actionlint|actionlint|actionlint
 clang-format|clang-format|clang-format
 gh|gh|gh
 git|git|git
