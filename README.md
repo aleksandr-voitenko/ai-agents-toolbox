@@ -1,8 +1,21 @@
-# Developer Tool Setup
+## The intent
+This is your AI agent on a typical developer machine: eager to help, but missing half the tools it needs. The AI Agents Toolbox project aims to solve this problem for you. 
 
-These scripts check for the command-line tools used by this workspace and can
-install missing tools through an already-installed package manager, with a
-documented Linux fallback for `actionlint` where native packages are unavailable.
+<img width="640" height="360" alt="Cartoon-style workshop scene showing a confused craftsman in overalls pulling out his empty pockets while looking for missing tools." src="https://github.com/user-attachments/assets/7770f5e2-0454-403e-8634-6c93f45b7ba9" />
+
+
+## Developer Tool Setup
+
+Every agentic coding session is better when the boring tools are already there:
+fast search, JSON and YAML processors, GitHub workflow checks, formatters,
+shell linters, PDF utilities, and the little CLI helpers that turn "one quick
+change" into actual momentum.
+
+This toolbox gives any AI agent (or a developer) a quick, conservative way to check
+a machine and optionally install the missing essentials through a package manager
+they already use. Try it when a fresh laptop, container, or borrowed workstation
+needs to feel ready for real AI-assisted development instead of another setup
+scavenger hunt.
 
 ## Tools Managed
 
