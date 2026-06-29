@@ -67,22 +67,6 @@ Windows, using PowerShell:
 $u="https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/windows.ps1"; $f=Join-Path $env:TEMP "ai-agents-toolbox-windows.ps1"; Invoke-WebRequest -UseBasicParsing $u -OutFile $f; powershell -ExecutionPolicy Bypass -File $f -InstallMissing
 ```
 
-macOS includes `curl` by default. Linux distributions and base images vary in
-which URL downloader is installed by default. Use whichever of `curl` or `wget`
-already exists, or install one through the distribution package manager first.
-
-They are intentionally conservative:
-
-- The default mode is check-only.
-- Existing commands are detected before any install attempt.
-- When missing tools are found in check-only mode, the summary prints a
-  copy/paste command for installing them.
-- Missing tools are installed only with `--install-missing` or `-InstallMissing`.
-- Existing tools from unknown or manual sources are not replaced.
-- Existing tools are upgraded only with `--upgrade-managed` or `-UpgradeManaged`,
-  and only when they appear to be owned by the same package manager.
-- Package managers are never installed automatically.
-
 ## macOS
 
 Check only:
@@ -102,14 +86,6 @@ Upgrade only tools already managed by Homebrew:
 ```sh
 ./macos.sh --upgrade-managed
 ```
-
-If Homebrew is not installed, install it from:
-
-```text
-https://brew.sh/
-```
-
-Then rerun the script.
 
 ## Linux
 
@@ -148,14 +124,6 @@ dnf      Fedora and RHEL-family distributions
 pacman   Arch Linux
 zypper   openSUSE
 ```
-
-If none of those exists, install or enable the package manager for your
-distribution and rerun the script.
-
-Linux package availability varies by distribution version. If a package is not
-available from the native repository, the script reports the failure instead of
-switching to a different installation source, except for the documented
-`actionlint` upstream release fallback.
 
 ## Windows
 
