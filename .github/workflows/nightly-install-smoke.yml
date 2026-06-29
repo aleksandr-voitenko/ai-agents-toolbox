@@ -10,6 +10,71 @@ permissions:
   contents: read
 
 jobs:
+  macos-url-bootstrap-smoke:
+    name: macOS URL bootstrap smoke
+    if: github.event_name == 'schedule'
+    runs-on: macos-latest
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+    steps:
+      - name: Run macOS curl bootstrap line
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh | bash -s -- --install-missing
+          curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh | bash -s -- --check-only | tee /tmp/setup-tools-url-check.log
+          grep -q "Missing before install: 0" /tmp/setup-tools-url-check.log
+          grep -q "Version checks failed:  0" /tmp/setup-tools-url-check.log
+
+  linux-url-bootstrap-smoke:
+    name: Linux URL bootstrap smoke (${{ matrix.downloader }})
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        downloader:
+          - curl
+          - wget
+    steps:
+      - name: Run Linux ${{ matrix.downloader }} bootstrap line in Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm ubuntu:24.04 bash -lc '
+            set -euo pipefail
+            apt-get update
+            if [ "${{ matrix.downloader }}" = "curl" ]; then
+              apt-get install -y ca-certificates curl
+              curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --install-missing
+              curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --check-only | tee /tmp/setup-tools-url-check.log
+            else
+              apt-get install -y ca-certificates wget
+              wget -qO- https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --install-missing
+              wget -qO- https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --check-only | tee /tmp/setup-tools-url-check.log
+            fi
+            grep -q "Missing before install: 0" /tmp/setup-tools-url-check.log
+            grep -q "Version checks failed:  0" /tmp/setup-tools-url-check.log
+          '
+
+  windows-url-bootstrap-smoke:
+    name: Windows URL bootstrap smoke
+    if: github.event_name == 'schedule'
+    runs-on: windows-latest
+    steps:
+      - name: Run Windows PowerShell URL bootstrap
+        shell: pwsh
+        run: |
+          choco feature disable --name=showDownloadProgress
+          $scriptUrl = "https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/windows.ps1"
+          $scriptPath = Join-Path $env:TEMP "ai-agents-toolbox-windows.ps1"
+          Invoke-WebRequest -UseBasicParsing $scriptUrl -OutFile $scriptPath
+          $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+          & $powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -InstallMissing -Manager choco
+          & $powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -CheckOnly | Tee-Object -FilePath "$env:TEMP\setup-tools-url-check.log"
+          Select-String -Path "$env:TEMP\setup-tools-url-check.log" -SimpleMatch "Missing before install: 0"
+          Select-String -Path "$env:TEMP\setup-tools-url-check.log" -SimpleMatch "Version checks failed:  0"
+
   linux-install-smoke:
     name: Linux install smoke (${{ matrix.manager }})
     runs-on: ubuntu-latest

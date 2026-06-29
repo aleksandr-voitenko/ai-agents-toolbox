@@ -3,6 +3,36 @@
 These scripts check for the command-line tools used by this workspace and can
 install missing tools through an already-installed package manager.
 
+## One-Line Installers
+
+macOS, using the default `curl`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh | bash -s -- --install-missing
+```
+
+Linux, using `curl`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --install-missing
+```
+
+Linux, using `wget`:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --install-missing
+```
+
+Windows, using PowerShell:
+
+```powershell
+$u="https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/windows.ps1"; $f=Join-Path $env:TEMP "ai-agents-toolbox-windows.ps1"; Invoke-WebRequest -UseBasicParsing $u -OutFile $f; powershell -ExecutionPolicy Bypass -File $f -InstallMissing
+```
+
+macOS includes `curl` by default. Linux distributions and base images vary in
+which URL downloader is installed by default. Use whichever of `curl` or `wget`
+already exists, or install one through the distribution package manager first.
+
 They are intentionally conservative:
 
 - The default mode is check-only.
