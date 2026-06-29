@@ -4,6 +4,43 @@ These scripts check for the command-line tools used by this workspace and can
 install missing tools through an already-installed package manager, with a
 documented Linux fallback for `actionlint` where native packages are unavailable.
 
+## Tools Managed
+
+The scripts manage these logical tools across supported platforms:
+
+```text
+ripgrep (rg) - Fast recursive text searcher with Git-aware defaults.
+fd - Fast filesystem search alternative to find.
+jq - Command-line JSON processor for querying and transforming structured data.
+curl - URL client for HTTP requests, downloads, and install bootstrapping.
+sqlite3 - Command-line shell for inspecting and managing SQLite databases.
+yq - Command-line YAML, JSON, XML, TOML, and properties processor.
+actionlint - Static checker for GitHub Actions workflow files.
+clang-format - Source formatter for C, C++, Objective-C, Java, JavaScript, and related languages.
+gh - GitHub CLI for repository, pull request, issue, and workflow operations.
+git - Distributed version control CLI.
+git-delta (delta) - Syntax-highlighting pager for Git and diff output.
+node - JavaScript runtime for local tooling and application scripts.
+yarn - JavaScript package manager and project script runner.
+python - Python runtime for scripts, tests, and developer utilities.
+cmake - Cross-platform build system generator.
+ninja - Small, fast build executor commonly used with CMake.
+bat - Syntax-highlighting file viewer and cat replacement.
+eza - Modern directory listing tool and ls replacement.
+fzf - Interactive fuzzy finder for shells and scripts.
+tree - Recursive directory tree viewer.
+file - File type detector based on content signatures.
+hyperfine - Command-line benchmarking tool.
+shellcheck - Static analyzer for shell scripts.
+shfmt - Formatter for shell scripts.
+ghostscript (gs) - PostScript and PDF interpreter used by document workflows.
+pdftotext - PDF text extraction tool from Poppler.
+```
+
+Some tools have different package names than command names. For example,
+`sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
+the `git-delta` package.
+
 ## One-Line Installers
 
 macOS, using the default `curl`:
@@ -45,29 +82,6 @@ They are intentionally conservative:
 - Existing tools are upgraded only with `--upgrade-managed` or `-UpgradeManaged`,
   and only when they appear to be owned by the same package manager.
 - Package managers are never installed automatically.
-
-## Tools Checked
-
-Core workspace tools:
-
-```text
-rg fd jq curl sqlite3 yq actionlint clang-format gh git node yarn python cmake ninja
-```
-
-Convenience and document tools:
-
-```text
-bat eza fzf tree delta file hyperfine shellcheck shfmt gs pdftotext
-```
-
-Some tools have different package names than command names. For example,
-`sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
-the `git-delta` package, `file` is installed by Homebrew's `libmagic` package,
-`gs` is installed by the `ghostscript` package, and `pdftotext` is installed by
-the `poppler` or `poppler-utils` package. On Linux, `actionlint` uses the
-native package manager where verified; when the selected distribution repository
-does not provide it, the script installs the official upstream GitHub release to
-`/usr/local/bin`.
 
 ## macOS
 
