@@ -4,7 +4,7 @@ This is your AI agent on a typical developer machine: eager to help, but missing
 <img width="640" height="360" alt="Cartoon-style workshop scene showing a confused craftsman in overalls pulling out his empty pockets while looking for missing tools." src="https://github.com/user-attachments/assets/7770f5e2-0454-403e-8634-6c93f45b7ba9" />
 
 
-## Developer Tool Setup
+## Why This Exists
 
 Every agentic coding session is better when the boring tools are already there:
 fast search, JSON and YAML processors, GitHub workflow checks, formatters,
