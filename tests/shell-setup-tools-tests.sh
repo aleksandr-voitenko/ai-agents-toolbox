@@ -251,6 +251,8 @@ test_linux_check_only_does_not_install() {
 
   assert_contains "$output" "Detected package manager: apt" "linux should detect fake apt"
   assert_contains "$output" "[missing] ripgrep" "linux should report missing tools"
+  assert_contains "$output" "To install missing tools with apt, run:" "linux check-only should print install guidance"
+  assert_contains "$output" "./linux.sh --manager apt --install-missing" "linux check-only should print a copy-paste install command"
   assert_not_contains "$output" "Installing " "linux check-only should not print installs"
   assert_log_not_contains "$log" "apt-get install" "linux check-only should not invoke apt-get install"
 }
@@ -380,6 +382,8 @@ test_macos_check_only_does_not_install() {
   FAKE_COMMAND_LOG="$log" FAKE_BREW_PREFIX="$prefix" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
 
   assert_contains "$output" "[missing] ripgrep" "macOS should report missing tools"
+  assert_contains "$output" "To install missing tools with Homebrew, run:" "macOS check-only should print install guidance"
+  assert_contains "$output" "./macos.sh --install-missing" "macOS check-only should print a copy-paste install command"
   assert_not_contains "$output" "Installing " "macOS check-only should not print installs"
   assert_log_not_contains "$log" "brew install" "macOS check-only should not invoke brew install"
 }

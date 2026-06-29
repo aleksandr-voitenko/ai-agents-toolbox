@@ -416,6 +416,23 @@ Install or enable your distribution package manager, then rerun this script.
 MSG
 }
 
+print_install_hint() {
+  if [ -n "$PACKAGE_MANAGER" ]; then
+    cat <<MSG
+
+To install missing tools with $PACKAGE_MANAGER, run:
+  ./linux.sh --manager $PACKAGE_MANAGER --install-missing
+MSG
+  else
+    print_manager_guidance
+    cat <<'MSG'
+
+Then run:
+  ./linux.sh --install-missing
+MSG
+  fi
+}
+
 missing_count=0
 unmanaged_count=0
 failed_version_count=0
@@ -501,4 +518,7 @@ echo "  Missing before install: $missing_count"
 echo "  Version checks failed:  $failed_version_count"
 if [ "$UPGRADE_MANAGED" -eq 1 ]; then
   echo "  Unmanaged upgrades skipped: $unmanaged_count"
+fi
+if [ "$missing_count" -gt 0 ] && [ "$INSTALL_MISSING" -eq 0 ]; then
+  print_install_hint
 fi

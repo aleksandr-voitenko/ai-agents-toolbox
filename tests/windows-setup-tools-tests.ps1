@@ -190,6 +190,8 @@ try {
 
     Assert-Contains $output "Detected package managers: winget" "Windows should detect fake winget"
     Assert-Contains $output "[missing] ripgrep" "Windows should report missing tools"
+    Assert-Contains $output "To install missing tools, run:" "Windows check-only should print install guidance"
+    Assert-Contains $output "powershell -ExecutionPolicy Bypass -File .\windows.ps1 -InstallMissing" "Windows check-only should print a copy-paste install command"
     Assert-NotContains $output "Installing " "Windows check-only should not print installs"
     Assert-LogNotContains $ctx.Log " install " "Windows check-only should not invoke installs"
   }

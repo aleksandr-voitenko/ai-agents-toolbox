@@ -348,6 +348,18 @@ Install one of these package managers, then rerun:
 "@
 }
 
+function Show-InstallHint {
+  if ((Get-AvailableManagers).Count -gt 0) {
+    @"
+
+To install missing tools, run:
+  powershell -ExecutionPolicy Bypass -File .\windows.ps1 -InstallMissing
+"@
+  } else {
+    Show-PackageManagerGuidance
+  }
+}
+
 Write-Host "Checking developer tools for Windows..."
 $availableManagers = Get-AvailableManagers
 if ($availableManagers.Count -gt 0) {
@@ -421,4 +433,7 @@ Write-Host "  Missing before install: $missingCount"
 Write-Host "  Version checks failed:  $failedVersionCount"
 if ($UpgradeManaged) {
   Write-Host "  Unmanaged upgrades skipped: $unmanagedCount"
+}
+if ($missingCount -gt 0 -and -not $InstallMissing) {
+  Show-InstallHint
 }

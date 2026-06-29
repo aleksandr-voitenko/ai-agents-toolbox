@@ -8,6 +8,8 @@ The product should feel like a safe prerequisite checker with optional install b
 
 - Detect required tools before attempting installation.
 - Report the command path, best-effort installation source, and version.
+- When check-only mode finds missing tools, end with a copy/paste command that
+  tells the user how to opt into installation.
 - Install only missing tools, and only when the user explicitly asks.
 - Upgrade only tools that appear to be managed by the same detected package
   manager, and only when the user explicitly asks.

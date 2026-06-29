@@ -38,6 +38,8 @@ They are intentionally conservative:
 
 - The default mode is check-only.
 - Existing commands are detected before any install attempt.
+- When missing tools are found in check-only mode, the summary prints a
+  copy/paste command for installing them.
 - Missing tools are installed only with `--install-missing` or `-InstallMissing`.
 - Existing tools from unknown or manual sources are not replaced.
 - Existing tools are upgraded only with `--upgrade-managed` or `-UpgradeManaged`,

@@ -188,6 +188,18 @@ Then rerun:
 MSG
 }
 
+print_install_hint() {
+  if [ -n "$BREW_BIN" ]; then
+    cat <<'MSG'
+
+To install missing tools with Homebrew, run:
+  ./macos.sh --install-missing
+MSG
+  else
+    print_brew_guidance
+  fi
+}
+
 brew_install() {
   local package="$1"
   echo "Installing $package with Homebrew..."
@@ -277,4 +289,7 @@ echo "  Missing before install: $missing_count"
 echo "  Version checks failed:  $failed_version_count"
 if [ "$UPGRADE_MANAGED" -eq 1 ]; then
   echo "  Unmanaged upgrades skipped: $unmanaged_count"
+fi
+if [ "$missing_count" -gt 0 ] && [ "$INSTALL_MISSING" -eq 0 ]; then
+  print_install_hint
 fi
