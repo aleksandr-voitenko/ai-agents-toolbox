@@ -93,7 +93,9 @@ jobs:
             prepare: pacman -Sy --noconfirm
           - image: opensuse/tumbleweed:latest
             manager: zypper
-            prepare: zypper --non-interactive refresh
+            # Avoid a full refresh: Tumbleweed appstream metadata is large and
+            # flaky on hosted runners, while install still builds package cache.
+            prepare: zypper modifyrepo --no-refresh --all
     steps:
       - uses: actions/checkout@v4
 

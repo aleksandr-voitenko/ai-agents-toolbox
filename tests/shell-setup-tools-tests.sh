@@ -367,7 +367,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_pandoc="zypper install -y pandoc-cli"
         expected_imagemagick="zypper install -y ImageMagick"
         expected_ffmpeg="zypper install -y ffmpeg-8"
-        expected_exiftool="zypper install -y perl-Image-ExifTool"
+        expected_exiftool="zypper install -y exiftool"
         last_expected="zypper install -y poppler-tools"
         ;;
     esac

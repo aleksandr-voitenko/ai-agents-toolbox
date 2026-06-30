@@ -84,7 +84,7 @@ file|file|file|file|file|file
 pandoc|pandoc|pandoc|pandoc-cli|pandoc-cli|pandoc-cli
 imagemagick|magick,convert|imagemagick|ImageMagick|imagemagick|ImageMagick
 ffmpeg|ffmpeg|ffmpeg|ffmpeg-free|ffmpeg|ffmpeg-8
-exiftool|exiftool,vendor_perl/exiftool|libimage-exiftool-perl|perl-Image-ExifTool|perl-image-exiftool|perl-Image-ExifTool
+exiftool|exiftool,vendor_perl/exiftool|libimage-exiftool-perl|perl-Image-ExifTool|perl-image-exiftool|exiftool
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck
 shfmt|shfmt|shfmt|shfmt|shfmt|shfmt
