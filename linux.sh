@@ -64,6 +64,7 @@ curl|curl|curl|curl|curl|curl
 sqlite3|sqlite3|sqlite3|sqlite|sqlite|sqlite3
 yq|yq|yq|yq|yq|yq
 actionlint|actionlint|github-release:actionlint|github-release:actionlint|actionlint|github-release:actionlint
+typos|typos|github-release:typos|github-release:typos|typos|github-release:typos
 clang-format|clang-format|clang-format|clang-tools-extra|clang|clang-tools
 gh|gh|gh|gh|github-cli|gh
 git|git|git|git|git|git
@@ -310,8 +311,9 @@ download_to_stdout() {
 }
 
 # Several default Linux repositories used by the install smoke matrix do not
-# package actionlint. Keep the fallback narrow: it only installs missing
-# actionlint from the upstream release and never replaces an existing command.
+# package every CLI in the tool list. Keep these fallbacks narrow: each one only
+# installs its missing tool from the upstream release and never replaces an
+# existing command.
 actionlint_release_arch() {
   case "$(uname -m)" in
     x86_64|amd64)
@@ -374,6 +376,82 @@ install_actionlint_release() {
 
   rm -rf "$tmp_dir"
   return "$status"
+}
+
+typos_release_target() {
+  case "$(uname -m)" in
+    x86_64|amd64)
+      printf 'x86_64-unknown-linux-musl'
+      ;;
+    aarch64|arm64)
+      printf 'aarch64-unknown-linux-musl'
+      ;;
+    *)
+      echo "Unsupported typos release architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+install_typos_release() {
+  local target api_url asset_name asset_url asset_digest tmp_dir status
+
+  target="$(typos_release_target)"
+  api_url="https://api.github.com/repos/crate-ci/typos/releases/latest"
+  tmp_dir="$(mktemp -d)"
+  status=0
+
+  (
+    set -e
+    cd "$tmp_dir"
+    download_to_stdout "$api_url" > release.json
+    asset_name="$(sed -n "s#.*\"name\":[[:space:]]*\"\\(typos-v[^\"]*-${target}\\.tar\\.gz\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_name" ]; then
+      echo "Could not find a typos Linux $target release asset." >&2
+      exit 1
+    fi
+
+    asset_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_url" ]; then
+      echo "Could not find a download URL for $asset_name." >&2
+      exit 1
+    fi
+
+    asset_digest="$(sed -n "/\"name\":[[:space:]]*\"$asset_name\"/,/\"browser_download_url\"/s#.*\"digest\":[[:space:]]*\"sha256:\\([a-f0-9]*\\)\".*#\\1#p" release.json | head -n 1)"
+    download_to_stdout "$asset_url" > "$asset_name"
+
+    if have sha256sum; then
+      if [ -z "$asset_digest" ]; then
+        echo "Could not find a GitHub SHA256 digest for $asset_name." >&2
+        exit 1
+      fi
+      printf '%s  %s\n' "$asset_digest" "$asset_name" | sha256sum -c -
+    else
+      echo "sha256sum was not found; skipping typos checksum verification." >&2
+    fi
+
+    tar -xzf "$asset_name" typos
+    run_elevated install -m 0755 typos /usr/local/bin/typos
+  ) || status=$?
+
+  rm -rf "$tmp_dir"
+  return "$status"
+}
+
+install_github_release_tool() {
+  local package="$1"
+  case "$package" in
+    github-release:actionlint)
+      install_actionlint_release
+      ;;
+    github-release:typos)
+      install_typos_release
+      ;;
+    *)
+      echo "Unsupported GitHub release installer: $package" >&2
+      return 1
+      ;;
+  esac
 }
 
 upgrade_source() {
@@ -456,7 +534,7 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
 
     if [ -n "$PACKAGE_MANAGER" ]; then
       package="$(package_for_manager "$PACKAGE_MANAGER" "$apt_pkg" "$dnf_pkg" "$pacman_pkg" "$zypper_pkg" || true)"
-      if [ "$package" = "github-release:actionlint" ]; then
+      if [ "${package#github-release:}" != "$package" ]; then
         printf ' installer: upstream GitHub release\n'
       elif [ -n "$package" ]; then
         printf ' package: %s\n' "$package"
@@ -464,8 +542,8 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
         printf ' package: unavailable\n'
       fi
 
-      if [ "$INSTALL_MISSING" -eq 1 ] && [ "$package" = "github-release:actionlint" ]; then
-        install_actionlint_release
+      if [ "$INSTALL_MISSING" -eq 1 ] && [ "${package#github-release:}" != "$package" ]; then
+        install_github_release_tool "$package"
       elif [ "$INSTALL_MISSING" -eq 1 ] && [ -n "$package" ]; then
         install_package "$PACKAGE_MANAGER" "$package"
       fi

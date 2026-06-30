@@ -165,7 +165,7 @@ add_fake_linux_manager() {
   esac
 }
 
-add_fake_actionlint_release_installer() {
+add_fake_github_release_installers() {
   local bin_dir="$1"
 
   write_executable "$bin_dir/curl" \
@@ -179,6 +179,14 @@ add_fake_actionlint_release_installer() {
     '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz\"}"' \
     '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz\"}"' \
     '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_386.tar.gz\"}"' \
+    '        ;;' \
+    '      *api.github.com/repos/crate-ci/typos/releases/latest*)' \
+    '        printf "%s\n" "{\"name\":\"typos-v1.47.2-x86_64-unknown-linux-musl.tar.gz\"}"' \
+    '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-x86_64-unknown-linux-musl.tar.gz\"}"' \
+    '        printf "%s\n" "{\"name\":\"typos-v1.47.2-aarch64-unknown-linux-musl.tar.gz\"}"' \
+    '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-aarch64-unknown-linux-musl.tar.gz\"}"' \
     '        ;;' \
     '      *)' \
     '        printf "fake actionlint archive\n"' \
@@ -258,7 +266,7 @@ test_linux_check_only_does_not_install() {
 }
 
 test_linux_install_missing_uses_selected_managers() {
-  local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint last_expected
+  local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos last_expected
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -267,7 +275,7 @@ test_linux_install_missing_uses_selected_managers() {
     output="$dir/output.txt"
     add_common_shell_utilities "$bin"
     add_fake_linux_manager "$bin" "$manager"
-    add_fake_actionlint_release_installer "$bin"
+    add_fake_github_release_installers "$bin"
 
     FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --manager "$manager" --install-missing
 
@@ -278,6 +286,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_delta="apt-get install -y git-delta"
         expected_file="apt-get install -y file"
         expected_actionlint="install -m 0755 actionlint /usr/local/bin/actionlint"
+        expected_typos="install -m 0755 typos /usr/local/bin/typos"
         last_expected="apt-get install -y poppler-utils"
         ;;
       dnf)
@@ -286,6 +295,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_delta="dnf install -y git-delta"
         expected_file="dnf install -y file"
         expected_actionlint="install -m 0755 actionlint /usr/local/bin/actionlint"
+        expected_typos="install -m 0755 typos /usr/local/bin/typos"
         last_expected="dnf install -y poppler-utils"
         ;;
       pacman)
@@ -294,6 +304,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_delta="pacman -S --needed --noconfirm git-delta"
         expected_file="pacman -S --needed --noconfirm file"
         expected_actionlint="pacman -S --needed --noconfirm actionlint"
+        expected_typos="pacman -S --needed --noconfirm typos"
         last_expected="pacman -S --needed --noconfirm poppler"
         ;;
       zypper)
@@ -302,6 +313,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_delta="zypper install -y git-delta"
         expected_file="zypper install -y file"
         expected_actionlint="install -m 0755 actionlint /usr/local/bin/actionlint"
+        expected_typos="install -m 0755 typos /usr/local/bin/typos"
         last_expected="zypper install -y poppler-tools"
         ;;
     esac
@@ -310,6 +322,7 @@ test_linux_install_missing_uses_selected_managers() {
     assert_log_contains "$log" "$expected_delta" "linux install should map git-delta for $manager"
     assert_log_contains "$log" "$expected_file" "linux install should map file for $manager"
     assert_log_contains "$log" "$expected_actionlint" "linux install should install actionlint for $manager"
+    assert_log_contains "$log" "$expected_typos" "linux install should install typos for $manager"
     assert_log_contains "$log" "$last_expected" "linux install should keep processing tools after $manager invokes a package command"
     if [ "$manager" = "apt" ]; then
       assert_log_contains "$log" "DEBIAN_FRONTEND=noninteractive" "apt installs should run noninteractively"
@@ -403,6 +416,7 @@ test_macos_install_missing_uses_brew() {
 
   assert_log_contains "$log" "brew install ripgrep" "macOS install should use Homebrew when requested"
   assert_log_contains "$log" "brew install actionlint" "macOS install should map actionlint to Homebrew"
+  assert_log_contains "$log" "brew install typos-cli" "macOS install should map typos to Homebrew typos-cli"
 }
 
 test_macos_install_without_brew_prints_guidance() {

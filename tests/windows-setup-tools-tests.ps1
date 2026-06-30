@@ -211,11 +211,13 @@ try {
         Assert-LogContains $ctx.Log "winget install --id rhysd.actionlint" "Windows should install actionlint with winget"
         Assert-LogContains $ctx.Log "winget install --id GnuWin32.File" "Windows should install file with winget"
         Assert-LogNotContains $ctx.Log "winget install --id dandavison" "Windows should not use an unverified delta winget id"
+        Assert-LogNotContains $ctx.Log "winget install --id typos" "Windows should not use an unverified typos winget id"
       } elseif ($manager -eq "scoop") {
         Assert-LogContains $ctx.Log "scoop install ripgrep" "Windows should install ripgrep with Scoop"
         Assert-LogContains $ctx.Log "scoop install sqlite" "Windows should install sqlite3 with Scoop"
         Assert-LogContains $ctx.Log "scoop install yq" "Windows should install yq with Scoop"
         Assert-LogContains $ctx.Log "scoop install actionlint" "Windows should install actionlint with Scoop"
+        Assert-LogContains $ctx.Log "scoop install typos" "Windows should install typos with Scoop"
         Assert-LogContains $ctx.Log "scoop install delta" "Windows should install git-delta with Scoop"
         Assert-LogContains $ctx.Log "scoop install file" "Windows should install file with Scoop"
       } else {
@@ -223,6 +225,7 @@ try {
         Assert-LogContains $ctx.Log "choco install sqlite -y" "Windows should install sqlite3 with Chocolatey"
         Assert-LogContains $ctx.Log "choco install yq -y" "Windows should install yq with Chocolatey"
         Assert-LogContains $ctx.Log "choco install actionlint -y" "Windows should install actionlint with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install typos -y" "Windows should install typos with Chocolatey"
         Assert-LogContains $ctx.Log "choco install delta -y" "Windows should install git-delta with Chocolatey"
         Assert-LogContains $ctx.Log "choco install file -y" "Windows should install file with Chocolatey"
       }

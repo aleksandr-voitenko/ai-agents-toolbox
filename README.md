@@ -29,6 +29,7 @@ curl - URL client for HTTP requests, downloads, and install bootstrapping.
 sqlite3 - Command-line shell for inspecting and managing SQLite databases.
 yq - Command-line YAML, JSON, XML, TOML, and properties processor.
 actionlint - Static checker for GitHub Actions workflow files.
+typos - Source-code-aware spell checker for code, docs, and config files.
 clang-format - Source formatter for C, C++, Objective-C, Java, JavaScript, and related languages.
 gh - GitHub CLI for repository, pull request, issue, and workflow operations.
 git - Distributed version control CLI.
@@ -52,7 +53,8 @@ pdftotext - PDF text extraction tool from Poppler.
 
 Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
-the `git-delta` package.
+the `git-delta` package, and `typos` is installed by Homebrew's `typos-cli`
+formula.
 
 ## One-Line Installers
 
