@@ -146,6 +146,24 @@ add_fake_empty_version_tool() {
     'esac'
 }
 
+add_fake_verbose_ffmpeg_tool() {
+  local bin_dir="$1"
+  write_executable "$bin_dir/ffmpeg" \
+    'case "$1" in' \
+    '  -version)' \
+    '    printf "ffmpeg version 1.0\n"' \
+    '    i=0' \
+    '    while [ "$i" -lt 20000 ]; do' \
+    '      printf "configuration line %s with enough content to trip pipefail under head\n" "$i"' \
+    '      i=$((i + 1))' \
+    '    done' \
+    '    ;;' \
+    '  *)' \
+    '    exit 2' \
+    '    ;;' \
+    'esac'
+}
+
 add_fake_linux_manager() {
   local bin_dir="$1"
   local manager="$2"
@@ -390,6 +408,45 @@ test_linux_empty_successful_version_output_is_not_a_failure() {
   assert_not_contains "$output" "version check failed" "linux should not report successful empty version output as failed"
 }
 
+test_linux_finds_vendor_perl_exiftool() {
+  local dir bin output
+  dir="$(new_case_dir linux-vendor-perl-exiftool)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  mkdir -p "$bin/vendor_perl"
+  add_common_shell_utilities "$bin"
+  write_executable "$bin/vendor_perl/exiftool" \
+    'if [ "$1" = "-ver" ]; then' \
+    '  printf "13.59\n"' \
+    'else' \
+    '  exit 2' \
+    'fi'
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "[found]   exiftool" "linux should find ExifTool in a vendor_perl PATH subdirectory"
+  assert_contains "$output" "$bin/vendor_perl/exiftool" "linux should report the vendor_perl ExifTool path"
+  assert_contains "$output" "13.59" "linux should run version checks for vendor_perl ExifTool"
+  assert_contains "$output" "Version checks failed:  0" "linux should not fail vendor_perl ExifTool version checks"
+}
+
+test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure() {
+  local dir bin output
+  dir="$(new_case_dir linux-verbose-ffmpeg-version)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_rpm_owner "$bin" "ffmpeg-free-8.1.2-1.fc44.x86_64"
+  add_fake_verbose_ffmpeg_tool "$bin"
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "[found]   ffmpeg" "linux should find fake FFmpeg"
+  assert_contains "$output" "ffmpeg version 1.0" "linux should report the first FFmpeg version line"
+  assert_contains "$output" "Version checks failed:  0" "linux should not fail verbose FFmpeg version checks"
+  assert_not_contains "$output" "version check failed" "linux should not let head/pipefail break verbose FFmpeg checks"
+}
+
 test_linux_upgrade_managed_uses_owner_only() {
   local dir bin log output
   dir="$(new_case_dir linux-upgrade-managed)"
@@ -537,6 +594,8 @@ run_test() {
 run_test "linux check-only does not install" test_linux_check_only_does_not_install
 run_test "linux install-missing uses selected managers" test_linux_install_missing_uses_selected_managers
 run_test "linux empty successful version output is not a failure" test_linux_empty_successful_version_output_is_not_a_failure
+run_test "linux finds vendor_perl ExifTool" test_linux_finds_vendor_perl_exiftool
+run_test "linux verbose FFmpeg version output is not a pipefail failure" test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure
 run_test "linux upgrade-managed uses managed owner only" test_linux_upgrade_managed_uses_owner_only
 run_test "linux install-missing without manager prints guidance" test_linux_install_without_manager_prints_guidance
 run_test "macOS check-only does not install" test_macos_check_only_does_not_install

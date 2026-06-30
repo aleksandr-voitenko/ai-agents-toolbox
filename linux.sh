@@ -84,7 +84,7 @@ file|file|file|file|file|file
 pandoc|pandoc|pandoc|pandoc-cli|pandoc-cli|pandoc-cli
 imagemagick|magick,convert|imagemagick|ImageMagick|imagemagick|ImageMagick
 ffmpeg|ffmpeg|ffmpeg|ffmpeg-free|ffmpeg|ffmpeg-8
-exiftool|exiftool|libimage-exiftool-perl|perl-Image-ExifTool|perl-image-exiftool|perl-Image-ExifTool
+exiftool|exiftool,vendor_perl/exiftool|libimage-exiftool-perl|perl-Image-ExifTool|perl-image-exiftool|perl-Image-ExifTool
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck
 shfmt|shfmt|shfmt|shfmt|shfmt|shfmt
@@ -139,37 +139,62 @@ run_package_command() {
 
 find_command() {
   local commands="$1"
-  local candidate
+  local candidate path_dir
+  local -a candidates path_dirs
   IFS=',' read -r -a candidates <<< "$commands"
   for candidate in "${candidates[@]}"; do
     if command -v "$candidate" >/dev/null 2>&1; then
       command -v "$candidate"
       return 0
     fi
+    # Arch and openSUSE Perl packages can place executables under a
+    # path-qualified vendor_perl directory inside a normal PATH entry.
+    case "$candidate" in
+      */*)
+        if [ "${candidate#/}" = "$candidate" ]; then
+          IFS=':' read -r -a path_dirs <<< "$PATH"
+          for path_dir in "${path_dirs[@]}"; do
+            [ -n "$path_dir" ] || path_dir="."
+            if [ -x "$path_dir/$candidate" ]; then
+              printf '%s\n' "$path_dir/$candidate"
+              return 0
+            fi
+          done
+        fi
+        ;;
+    esac
   done
   return 1
 }
 
+first_output_line() {
+  local output
+  output="$("$@" 2>&1)" || return 1
+  printf '%s\n' "${output%%$'\n'*}"
+}
+
 version_for() {
   local command_name="$1"
-  case "$command_name" in
+  local command_base
+  command_base="$(basename "$command_name")"
+  case "$command_base" in
     gs)
-      "$command_name" --version 2>&1 | head -n 1
+      first_output_line "$command_name" --version
       ;;
     pdftotext)
-      "$command_name" -v 2>&1 | head -n 1
+      first_output_line "$command_name" -v
       ;;
     shfmt)
-      "$command_name" -version 2>&1 | head -n 1
+      first_output_line "$command_name" -version
       ;;
     ffmpeg)
-      "$command_name" -version 2>&1 | head -n 1
+      first_output_line "$command_name" -version
       ;;
     exiftool)
-      "$command_name" -ver 2>&1 | head -n 1
+      first_output_line "$command_name" -ver
       ;;
     *)
-      "$command_name" --version 2>&1 | head -n 1
+      first_output_line "$command_name" --version
       ;;
   esac
 }
@@ -632,9 +657,8 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
     continue
   fi
 
-  actual_command="$(basename "$command_path")"
   source="$(detect_source "$command_path")"
-  if version="$(version_for "$actual_command")"; then
+  if version="$(version_for "$command_path")"; then
     if [ -z "$version" ]; then
       version="$(package_version_for_source "$source" "$command_path" || true)"
       if [ -z "$version" ]; then

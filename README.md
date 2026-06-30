@@ -61,7 +61,7 @@ Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
 the `git-delta` package, `difft` by `difftastic`, and `typos` by Homebrew's
 `typos-cli` formula. Some Linux distributions also package `pandoc`, `ffmpeg`,
-ImageMagick, and ExifTool under distribution-specific names.
+ImageMagick, and ExifTool under distribution-specific names or paths.
 
 ## One-Line Installers
 

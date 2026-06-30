@@ -45,7 +45,7 @@ This conservative stance is the main project invariant.
   `sha256sum` is available, and installs it to `/usr/local/bin` without taking
   over future managed upgrades.
 - Treat source detection as best effort and label uncertain cases honestly.
-- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `difftastic` -> `difft`, `typos-cli` -> `typos`, `libmagic` -> `file`, `ImageMagick`/`imagemagick` -> `magick` or `convert`, `libimage-exiftool-perl`/`perl-Image-ExifTool`/`perl-image-exiftool` -> `exiftool`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
+- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `difftastic` -> `difft`, `typos-cli` -> `typos`, `libmagic` -> `file`, `ImageMagick`/`imagemagick` -> `magick` or `convert`, `libimage-exiftool-perl`/`perl-Image-ExifTool`/`perl-image-exiftool` -> `exiftool` or `vendor_perl/exiftool`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
 - Be careful with Windows: PATH shims and multi-manager ownership can be messy. Prefer reporting uncertainty over making destructive assumptions.
 
 ## Implementation Guidance
