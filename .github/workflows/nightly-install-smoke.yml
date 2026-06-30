@@ -30,6 +30,8 @@ jobs:
     name: Linux URL bootstrap smoke (${{ matrix.downloader }})
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     strategy:
       fail-fast: false
       matrix:
@@ -41,7 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm ubuntu:24.04 bash -lc '
+          docker run --rm -e GITHUB_TOKEN ubuntu:24.04 bash -lc '
             set -euo pipefail
             apt-get update
             if [ "${{ matrix.downloader }}" = "curl" ]; then
@@ -78,6 +80,8 @@ jobs:
   linux-install-smoke:
     name: Linux install smoke (${{ matrix.manager }})
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm \
+            -e GITHUB_TOKEN \
             -v "$PWD:/workspace" \
             -w /workspace \
             "${{ matrix.image }}" \

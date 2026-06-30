@@ -187,40 +187,50 @@ add_fake_github_release_installers() {
   local bin_dir="$1"
 
   write_executable "$bin_dir/curl" \
-    'case "$1" in' \
-    '  --version)' \
-    '    printf "curl 8.0\n"' \
+    'if [ "$1" = "--version" ]; then' \
+    '  printf "curl 8.0\n"' \
+    '  exit 0' \
+    'fi' \
+    'url=""' \
+    'while [ "$#" -gt 0 ]; do' \
+    '  case "$1" in' \
+    '    -H)' \
+    '      printf "curl header %s\n" "$2" >> "$FAKE_COMMAND_LOG"' \
+    '      shift 2' \
+    '      ;;' \
+    '    -fsSL)' \
+    '      shift' \
+    '      ;;' \
+    '    *)' \
+    '      url="$1"' \
+    '      shift' \
+    '      ;;' \
+    '  esac' \
+    'done' \
+    'case "$url" in' \
+    '  *api.github.com/repos/rhysd/actionlint/releases/latest*)' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_386.tar.gz\"}"' \
     '    ;;' \
-    '  -fsSL)' \
-    '    case "$2" in' \
-    '      *api.github.com/repos/rhysd/actionlint/releases/latest*)' \
-    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz\"}"' \
-    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz\"}"' \
-    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_386.tar.gz\"}"' \
-    '        ;;' \
-    '      *api.github.com/repos/crate-ci/typos/releases/latest*)' \
-    '        printf "%s\n" "{\"name\":\"typos-v1.47.2-x86_64-unknown-linux-musl.tar.gz\"}"' \
-    '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
-    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-x86_64-unknown-linux-musl.tar.gz\"}"' \
-    '        printf "%s\n" "{\"name\":\"typos-v1.47.2-aarch64-unknown-linux-musl.tar.gz\"}"' \
-    '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
-    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-aarch64-unknown-linux-musl.tar.gz\"}"' \
-    '        ;;' \
-    '      *api.github.com/repos/Wilfred/difftastic/releases/latest*)' \
-    '        printf "%s\n" "{\"name\":\"difft-x86_64-unknown-linux-gnu.tar.gz\"}"' \
-    '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
-    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-x86_64-unknown-linux-gnu.tar.gz\"}"' \
-    '        printf "%s\n" "{\"name\":\"difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
-    '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
-    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
-    '        ;;' \
-    '      *)' \
-    '        printf "fake actionlint archive\n"' \
-    '        ;;' \
-    '    esac' \
+    '  *api.github.com/repos/crate-ci/typos/releases/latest*)' \
+    '    printf "%s\n" "{\"name\":\"typos-v1.47.2-x86_64-unknown-linux-musl.tar.gz\"}"' \
+    '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-x86_64-unknown-linux-musl.tar.gz\"}"' \
+    '    printf "%s\n" "{\"name\":\"typos-v1.47.2-aarch64-unknown-linux-musl.tar.gz\"}"' \
+    '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-aarch64-unknown-linux-musl.tar.gz\"}"' \
+    '    ;;' \
+    '  *api.github.com/repos/Wilfred/difftastic/releases/latest*)' \
+    '    printf "%s\n" "{\"name\":\"difft-x86_64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-x86_64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"name\":\"difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
     '    ;;' \
     '  *)' \
-    '    exit 2' \
+    '    printf "fake actionlint archive\n"' \
     '    ;;' \
     'esac'
 
@@ -388,6 +398,22 @@ test_linux_install_missing_uses_selected_managers() {
       assert_log_contains "$log" "DEBIAN_FRONTEND=noninteractive" "apt installs should run noninteractively"
     fi
   done
+}
+
+test_linux_github_release_downloads_use_token_when_available() {
+  local dir bin log output
+  dir="$(new_case_dir linux-github-token)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_linux_manager "$bin" apt
+  add_fake_github_release_installers "$bin"
+
+  GITHUB_TOKEN="fake-token" FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --manager apt --install-missing
+
+  assert_log_contains "$log" "curl header Authorization: Bearer fake-token" "linux release downloads should authenticate GitHub API requests when a token is available"
+  assert_log_contains "$log" "curl header X-GitHub-Api-Version: 2022-11-28" "linux release downloads should send the GitHub API version header with token-authenticated requests"
 }
 
 test_linux_empty_successful_version_output_is_not_a_failure() {
@@ -593,6 +619,7 @@ run_test() {
 
 run_test "linux check-only does not install" test_linux_check_only_does_not_install
 run_test "linux install-missing uses selected managers" test_linux_install_missing_uses_selected_managers
+run_test "linux GitHub release downloads use token" test_linux_github_release_downloads_use_token_when_available
 run_test "linux empty successful version output is not a failure" test_linux_empty_successful_version_output_is_not_a_failure
 run_test "linux finds vendor_perl ExifTool" test_linux_finds_vendor_perl_exiftool
 run_test "linux verbose FFmpeg version output is not a pipefail failure" test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure

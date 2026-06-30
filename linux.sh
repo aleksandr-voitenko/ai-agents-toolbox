@@ -335,6 +335,17 @@ install_package() {
 download_to_stdout() {
   local url="$1"
   if have curl; then
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+      case "$url" in
+        https://api.github.com/*)
+          curl -fsSL \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$url"
+          return 0
+          ;;
+      esac
+    fi
     curl -fsSL "$url"
     return 0
   fi
