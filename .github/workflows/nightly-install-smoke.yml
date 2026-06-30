@@ -107,7 +107,19 @@ jobs:
             "${{ matrix.image }}" \
             bash -lc '
               set -euo pipefail
-              ${{ matrix.prepare }}
+              retry() {
+                attempt=1
+                max_attempts=3
+                until "$@"; do
+                  if [ "$attempt" -ge "$max_attempts" ]; then
+                    return 1
+                  fi
+                  echo "prepare command failed; retrying in 30 seconds: $*"
+                  sleep 30
+                  attempt=$((attempt + 1))
+                done
+              }
+              retry ${{ matrix.prepare }}
               ./linux.sh --install-missing --manager "${{ matrix.manager }}"
               ./linux.sh --check-only | tee /tmp/setup-tools-check.log
               grep -q "Missing before install: 0" /tmp/setup-tools-check.log
