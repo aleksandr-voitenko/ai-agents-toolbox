@@ -43,6 +43,8 @@ $Tools = @(
   @{ Name = "gh"; Commands = @("gh.exe", "gh"); Winget = "GitHub.cli"; Scoop = "gh"; Choco = "gh" },
   @{ Name = "git"; Commands = @("git.exe", "git"); Winget = "Git.Git"; Scoop = "git"; Choco = "git" },
   @{ Name = "git-delta"; Commands = @("delta.exe", "delta"); Winget = $null; Scoop = "delta"; Choco = "delta" },
+  @{ Name = "just"; Commands = @("just.exe", "just"); Winget = "Casey.Just"; Scoop = "just"; Choco = "just" },
+  @{ Name = "difftastic"; Commands = @("difft.exe", "difft"); Winget = "Wilfred.difftastic"; Scoop = "difftastic"; Choco = "difftastic" },
   @{ Name = "node"; Commands = @("node.exe", "node"); Winget = "OpenJS.NodeJS.LTS"; Scoop = "nodejs-lts"; Choco = "nodejs-lts" },
   @{ Name = "yarn"; Commands = @("yarn.cmd", "yarn.exe", "yarn"); Winget = "Yarn.Yarn"; Scoop = "yarn"; Choco = "yarn" },
   @{ Name = "python"; Commands = @("python.exe", "python", "py.exe", "py"); Winget = "Python.Python.3"; Scoop = "python"; Choco = "python" },
@@ -53,6 +55,10 @@ $Tools = @(
   @{ Name = "fzf"; Commands = @("fzf.exe", "fzf"); Winget = "junegunn.fzf"; Scoop = "fzf"; Choco = "fzf" },
   @{ Name = "tree"; Commands = @("tree.com", "tree.exe", "tree"); Winget = $null; Scoop = "tree"; Choco = "tree" },
   @{ Name = "file"; Commands = @("file.exe", "file"); Winget = "GnuWin32.File"; Scoop = "file"; Choco = "file" },
+  @{ Name = "pandoc"; Commands = @("pandoc.exe", "pandoc"); Winget = "JohnMacFarlane.Pandoc"; Scoop = "pandoc"; Choco = "pandoc" },
+  @{ Name = "imagemagick"; Commands = @("magick.exe", "magick"); Winget = "ImageMagick.ImageMagick"; Scoop = "imagemagick"; Choco = "imagemagick" },
+  @{ Name = "ffmpeg"; Commands = @("ffmpeg.exe", "ffmpeg"); Winget = "Gyan.FFmpeg"; Scoop = "ffmpeg"; Choco = "ffmpeg" },
+  @{ Name = "exiftool"; Commands = @("exiftool.exe", "exiftool"); Winget = "OliverBetz.ExifTool"; Scoop = "exiftool"; Choco = "exiftool" },
   @{ Name = "hyperfine"; Commands = @("hyperfine.exe", "hyperfine"); Winget = "sharkdp.hyperfine"; Scoop = "hyperfine"; Choco = "hyperfine" },
   @{ Name = "shellcheck"; Commands = @("shellcheck.exe", "shellcheck"); Winget = "koalaman.shellcheck"; Scoop = "shellcheck"; Choco = "shellcheck" },
   @{ Name = "shfmt"; Commands = @("shfmt.exe", "shfmt"); Winget = "mvdan.shfmt"; Scoop = "shfmt"; Choco = "shfmt" },
@@ -179,6 +185,18 @@ function Get-VersionLine {
     }
     if ($CommandName -eq "pdftotext.exe" -or $CommandName -eq "pdftotext") {
       $output = & $CommandName -v 2>&1 | Select-Object -First 1
+      if ($LASTEXITCODE -ne 0) { return "version check failed" }
+      if ($null -eq $output) { return "" }
+      return $output
+    }
+    if ($CommandName -eq "ffmpeg.exe" -or $CommandName -eq "ffmpeg") {
+      $output = & $CommandName -version 2>&1 | Select-Object -First 1
+      if ($LASTEXITCODE -ne 0) { return "version check failed" }
+      if ($null -eq $output) { return "" }
+      return $output
+    }
+    if ($CommandName -eq "exiftool.exe" -or $CommandName -eq "exiftool") {
+      $output = & $CommandName -ver 2>&1 | Select-Object -First 1
       if ($LASTEXITCODE -ne 0) { return "version check failed" }
       if ($null -eq $output) { return "" }
       return $output

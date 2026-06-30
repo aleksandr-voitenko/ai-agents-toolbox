@@ -58,6 +58,8 @@ clang-format|clang-format|clang-format
 gh|gh|gh
 git|git|git
 git-delta|delta|git-delta
+just|just|just
+difftastic|difft|difftastic
 node|node|node
 yarn|yarn|yarn
 python|python3,python|python
@@ -68,6 +70,10 @@ eza|eza|eza
 fzf|fzf|fzf
 tree|tree|tree
 file|file|libmagic
+pandoc|pandoc|pandoc
+imagemagick|magick,convert|imagemagick
+ffmpeg|ffmpeg|ffmpeg
+exiftool|exiftool|exiftool
 hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck
 shfmt|shfmt|shfmt
@@ -115,6 +121,12 @@ version_for() {
       ;;
     pdftotext)
       "$command_name" -v 2>&1 | head -n 1
+      ;;
+    ffmpeg)
+      "$command_name" -version 2>&1 | head -n 1
+      ;;
+    exiftool)
+      "$command_name" -ver 2>&1 | head -n 1
       ;;
     *)
       "$command_name" --version 2>&1 | head -n 1

@@ -34,6 +34,8 @@ clang-format - Source formatter for C, C++, Objective-C, Java, JavaScript, and r
 gh - GitHub CLI for repository, pull request, issue, and workflow operations.
 git - Distributed version control CLI.
 git-delta (delta) - Syntax-highlighting pager for Git and diff output.
+just - Command runner for project-local recipes and repeatable tasks.
+difftastic (difft) - Syntax-aware structural diff tool.
 node - JavaScript runtime for local tooling and application scripts.
 yarn - JavaScript package manager and project script runner.
 python - Python runtime for scripts, tests, and developer utilities.
@@ -44,6 +46,10 @@ eza - Modern directory listing tool and ls replacement.
 fzf - Interactive fuzzy finder for shells and scripts.
 tree - Recursive directory tree viewer.
 file - File type detector based on content signatures.
+pandoc - Universal document converter for markup and publishing workflows.
+imagemagick (magick/convert) - Image inspection and conversion toolkit.
+ffmpeg - Audio and video recording, conversion, and inspection toolkit.
+exiftool - Metadata reader and writer for images, media, and documents.
 hyperfine - Command-line benchmarking tool.
 shellcheck - Static analyzer for shell scripts.
 shfmt - Formatter for shell scripts.
@@ -53,8 +59,9 @@ pdftotext - PDF text extraction tool from Poppler.
 
 Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
-the `git-delta` package, and `typos` is installed by Homebrew's `typos-cli`
-formula.
+the `git-delta` package, `difft` by `difftastic`, and `typos` by Homebrew's
+`typos-cli` formula. Some Linux distributions also package `pandoc`, `ffmpeg`,
+ImageMagick, and ExifTool under distribution-specific names.
 
 ## One-Line Installers
 

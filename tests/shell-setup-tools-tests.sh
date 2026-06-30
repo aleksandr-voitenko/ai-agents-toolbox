@@ -188,6 +188,14 @@ add_fake_github_release_installers() {
     '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
     '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-aarch64-unknown-linux-musl.tar.gz\"}"' \
     '        ;;' \
+    '      *api.github.com/repos/Wilfred/difftastic/releases/latest*)' \
+    '        printf "%s\n" "{\"name\":\"difft-x86_64-unknown-linux-gnu.tar.gz\"}"' \
+    '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-x86_64-unknown-linux-gnu.tar.gz\"}"' \
+    '        printf "%s\n" "{\"name\":\"difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
+    '        printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '        printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
+    '        ;;' \
     '      *)' \
     '        printf "fake actionlint archive\n"' \
     '        ;;' \
@@ -199,7 +207,10 @@ add_fake_github_release_installers() {
     'esac'
 
   write_executable "$bin_dir/tar" \
-    'printf "tar %s\n" "$*" >> "$FAKE_COMMAND_LOG"'
+    'printf "tar %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    ': > actionlint' \
+    ': > typos' \
+    ': > difft'
 
   write_executable "$bin_dir/install" \
     'printf "install %s\n" "$*" >> "$FAKE_COMMAND_LOG"'
@@ -266,7 +277,8 @@ test_linux_check_only_does_not_install() {
 }
 
 test_linux_install_missing_uses_selected_managers() {
-  local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos last_expected
+  local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos
+  local expected_just expected_difftastic expected_pandoc expected_imagemagick expected_ffmpeg expected_exiftool last_expected
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -287,6 +299,12 @@ test_linux_install_missing_uses_selected_managers() {
         expected_file="apt-get install -y file"
         expected_actionlint="install -m 0755 actionlint /usr/local/bin/actionlint"
         expected_typos="install -m 0755 typos /usr/local/bin/typos"
+        expected_just="apt-get install -y just"
+        expected_difftastic="install -m 0755 difft /usr/local/bin/difft"
+        expected_pandoc="apt-get install -y pandoc"
+        expected_imagemagick="apt-get install -y imagemagick"
+        expected_ffmpeg="apt-get install -y ffmpeg"
+        expected_exiftool="apt-get install -y libimage-exiftool-perl"
         last_expected="apt-get install -y poppler-utils"
         ;;
       dnf)
@@ -296,6 +314,12 @@ test_linux_install_missing_uses_selected_managers() {
         expected_file="dnf install -y file"
         expected_actionlint="install -m 0755 actionlint /usr/local/bin/actionlint"
         expected_typos="install -m 0755 typos /usr/local/bin/typos"
+        expected_just="dnf install -y just"
+        expected_difftastic="dnf install -y difftastic"
+        expected_pandoc="dnf install -y pandoc-cli"
+        expected_imagemagick="dnf install -y ImageMagick"
+        expected_ffmpeg="dnf install -y ffmpeg-free"
+        expected_exiftool="dnf install -y perl-Image-ExifTool"
         last_expected="dnf install -y poppler-utils"
         ;;
       pacman)
@@ -305,6 +329,12 @@ test_linux_install_missing_uses_selected_managers() {
         expected_file="pacman -S --needed --noconfirm file"
         expected_actionlint="pacman -S --needed --noconfirm actionlint"
         expected_typos="pacman -S --needed --noconfirm typos"
+        expected_just="pacman -S --needed --noconfirm just"
+        expected_difftastic="pacman -S --needed --noconfirm difftastic"
+        expected_pandoc="pacman -S --needed --noconfirm pandoc-cli"
+        expected_imagemagick="pacman -S --needed --noconfirm imagemagick"
+        expected_ffmpeg="pacman -S --needed --noconfirm ffmpeg"
+        expected_exiftool="pacman -S --needed --noconfirm perl-image-exiftool"
         last_expected="pacman -S --needed --noconfirm poppler"
         ;;
       zypper)
@@ -314,6 +344,12 @@ test_linux_install_missing_uses_selected_managers() {
         expected_file="zypper install -y file"
         expected_actionlint="install -m 0755 actionlint /usr/local/bin/actionlint"
         expected_typos="install -m 0755 typos /usr/local/bin/typos"
+        expected_just="zypper install -y just"
+        expected_difftastic="zypper install -y difftastic"
+        expected_pandoc="zypper install -y pandoc-cli"
+        expected_imagemagick="zypper install -y ImageMagick"
+        expected_ffmpeg="zypper install -y ffmpeg-8"
+        expected_exiftool="zypper install -y perl-Image-ExifTool"
         last_expected="zypper install -y poppler-tools"
         ;;
     esac
@@ -323,6 +359,12 @@ test_linux_install_missing_uses_selected_managers() {
     assert_log_contains "$log" "$expected_file" "linux install should map file for $manager"
     assert_log_contains "$log" "$expected_actionlint" "linux install should install actionlint for $manager"
     assert_log_contains "$log" "$expected_typos" "linux install should install typos for $manager"
+    assert_log_contains "$log" "$expected_just" "linux install should map just for $manager"
+    assert_log_contains "$log" "$expected_difftastic" "linux install should map difftastic for $manager"
+    assert_log_contains "$log" "$expected_pandoc" "linux install should map pandoc for $manager"
+    assert_log_contains "$log" "$expected_imagemagick" "linux install should map ImageMagick for $manager"
+    assert_log_contains "$log" "$expected_ffmpeg" "linux install should map ffmpeg for $manager"
+    assert_log_contains "$log" "$expected_exiftool" "linux install should map exiftool for $manager"
     assert_log_contains "$log" "$last_expected" "linux install should keep processing tools after $manager invokes a package command"
     if [ "$manager" = "apt" ]; then
       assert_log_contains "$log" "DEBIAN_FRONTEND=noninteractive" "apt installs should run noninteractively"
@@ -417,6 +459,12 @@ test_macos_install_missing_uses_brew() {
   assert_log_contains "$log" "brew install ripgrep" "macOS install should use Homebrew when requested"
   assert_log_contains "$log" "brew install actionlint" "macOS install should map actionlint to Homebrew"
   assert_log_contains "$log" "brew install typos-cli" "macOS install should map typos to Homebrew typos-cli"
+  assert_log_contains "$log" "brew install just" "macOS install should map just to Homebrew"
+  assert_log_contains "$log" "brew install difftastic" "macOS install should map difftastic to Homebrew"
+  assert_log_contains "$log" "brew install pandoc" "macOS install should map pandoc to Homebrew"
+  assert_log_contains "$log" "brew install imagemagick" "macOS install should map ImageMagick to Homebrew"
+  assert_log_contains "$log" "brew install ffmpeg" "macOS install should map ffmpeg to Homebrew"
+  assert_log_contains "$log" "brew install exiftool" "macOS install should map exiftool to Homebrew"
 }
 
 test_macos_install_without_brew_prints_guidance() {

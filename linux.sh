@@ -69,6 +69,8 @@ clang-format|clang-format|clang-format|clang-tools-extra|clang|clang-tools
 gh|gh|gh|gh|github-cli|gh
 git|git|git|git|git|git
 git-delta|delta|git-delta|git-delta|git-delta|git-delta
+just|just|just|just|just|just
+difftastic|difft|github-release:difftastic|difftastic|difftastic|difftastic
 node|node,nodejs|nodejs|nodejs|nodejs|nodejs
 yarn|yarn,yarnpkg|yarnpkg|yarnpkg|yarn|yarn
 python|python3,python|python3|python3|python|python3
@@ -79,6 +81,10 @@ eza|eza|eza|eza|eza|eza
 fzf|fzf|fzf|fzf|fzf|fzf
 tree|tree|tree|tree|tree|tree
 file|file|file|file|file|file
+pandoc|pandoc|pandoc|pandoc-cli|pandoc-cli|pandoc-cli
+imagemagick|magick,convert|imagemagick|ImageMagick|imagemagick|ImageMagick
+ffmpeg|ffmpeg|ffmpeg|ffmpeg-free|ffmpeg|ffmpeg-8
+exiftool|exiftool|libimage-exiftool-perl|perl-Image-ExifTool|perl-image-exiftool|perl-Image-ExifTool
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck
 shfmt|shfmt|shfmt|shfmt|shfmt|shfmt
@@ -155,6 +161,12 @@ version_for() {
       ;;
     shfmt)
       "$command_name" -version 2>&1 | head -n 1
+      ;;
+    ffmpeg)
+      "$command_name" -version 2>&1 | head -n 1
+      ;;
+    exiftool)
+      "$command_name" -ver 2>&1 | head -n 1
       ;;
     *)
       "$command_name" --version 2>&1 | head -n 1
@@ -430,8 +442,72 @@ install_typos_release() {
       echo "sha256sum was not found; skipping typos checksum verification." >&2
     fi
 
-    tar -xzf "$asset_name" typos
+    tar -xzf "$asset_name"
+    if [ ! -f typos ]; then
+      echo "Could not find typos in $asset_name." >&2
+      exit 1
+    fi
     run_elevated install -m 0755 typos /usr/local/bin/typos
+  ) || status=$?
+
+  rm -rf "$tmp_dir"
+  return "$status"
+}
+
+difftastic_release_target() {
+  case "$(uname -m)" in
+    x86_64|amd64)
+      printf 'x86_64-unknown-linux-gnu'
+      ;;
+    aarch64|arm64)
+      printf 'aarch64-unknown-linux-gnu'
+      ;;
+    *)
+      echo "Unsupported difftastic release architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+install_difftastic_release() {
+  local target api_url asset_name asset_url asset_digest tmp_dir status
+
+  target="$(difftastic_release_target)"
+  api_url="https://api.github.com/repos/Wilfred/difftastic/releases/latest"
+  tmp_dir="$(mktemp -d)"
+  status=0
+
+  (
+    set -e
+    cd "$tmp_dir"
+    download_to_stdout "$api_url" > release.json
+    asset_name="$(sed -n "s#.*\"name\":[[:space:]]*\"\\(difft-${target}\\.tar\\.gz\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_name" ]; then
+      echo "Could not find a difftastic Linux $target release asset." >&2
+      exit 1
+    fi
+
+    asset_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_url" ]; then
+      echo "Could not find a download URL for $asset_name." >&2
+      exit 1
+    fi
+
+    asset_digest="$(sed -n "/\"name\":[[:space:]]*\"$asset_name\"/,/\"browser_download_url\"/s#.*\"digest\":[[:space:]]*\"sha256:\\([a-f0-9]*\\)\".*#\\1#p" release.json | head -n 1)"
+    download_to_stdout "$asset_url" > "$asset_name"
+
+    if have sha256sum; then
+      if [ -z "$asset_digest" ]; then
+        echo "Could not find a GitHub SHA256 digest for $asset_name." >&2
+        exit 1
+      fi
+      printf '%s  %s\n' "$asset_digest" "$asset_name" | sha256sum -c -
+    else
+      echo "sha256sum was not found; skipping difftastic checksum verification." >&2
+    fi
+
+    tar -xzf "$asset_name" difft
+    run_elevated install -m 0755 difft /usr/local/bin/difft
   ) || status=$?
 
   rm -rf "$tmp_dir"
@@ -446,6 +522,9 @@ install_github_release_tool() {
       ;;
     github-release:typos)
       install_typos_release
+      ;;
+    github-release:difftastic)
+      install_difftastic_release
       ;;
     *)
       echo "Unsupported GitHub release installer: $package" >&2

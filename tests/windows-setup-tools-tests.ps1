@@ -210,6 +210,12 @@ try {
         Assert-LogContains $ctx.Log "winget install --id MikeFarah.yq" "Windows should install yq with winget"
         Assert-LogContains $ctx.Log "winget install --id rhysd.actionlint" "Windows should install actionlint with winget"
         Assert-LogContains $ctx.Log "winget install --id GnuWin32.File" "Windows should install file with winget"
+        Assert-LogContains $ctx.Log "winget install --id Casey.Just" "Windows should install just with winget"
+        Assert-LogContains $ctx.Log "winget install --id Wilfred.difftastic" "Windows should install difftastic with winget"
+        Assert-LogContains $ctx.Log "winget install --id JohnMacFarlane.Pandoc" "Windows should install pandoc with winget"
+        Assert-LogContains $ctx.Log "winget install --id ImageMagick.ImageMagick" "Windows should install ImageMagick with winget"
+        Assert-LogContains $ctx.Log "winget install --id Gyan.FFmpeg" "Windows should install ffmpeg with winget"
+        Assert-LogContains $ctx.Log "winget install --id OliverBetz.ExifTool" "Windows should install exiftool with winget"
         Assert-LogNotContains $ctx.Log "winget install --id dandavison" "Windows should not use an unverified delta winget id"
         Assert-LogNotContains $ctx.Log "winget install --id typos" "Windows should not use an unverified typos winget id"
       } elseif ($manager -eq "scoop") {
@@ -220,6 +226,12 @@ try {
         Assert-LogContains $ctx.Log "scoop install typos" "Windows should install typos with Scoop"
         Assert-LogContains $ctx.Log "scoop install delta" "Windows should install git-delta with Scoop"
         Assert-LogContains $ctx.Log "scoop install file" "Windows should install file with Scoop"
+        Assert-LogContains $ctx.Log "scoop install just" "Windows should install just with Scoop"
+        Assert-LogContains $ctx.Log "scoop install difftastic" "Windows should install difftastic with Scoop"
+        Assert-LogContains $ctx.Log "scoop install pandoc" "Windows should install pandoc with Scoop"
+        Assert-LogContains $ctx.Log "scoop install imagemagick" "Windows should install ImageMagick with Scoop"
+        Assert-LogContains $ctx.Log "scoop install ffmpeg" "Windows should install ffmpeg with Scoop"
+        Assert-LogContains $ctx.Log "scoop install exiftool" "Windows should install exiftool with Scoop"
       } else {
         Assert-LogContains $ctx.Log "choco install ripgrep -y" "Windows should install ripgrep with Chocolatey"
         Assert-LogContains $ctx.Log "choco install sqlite -y" "Windows should install sqlite3 with Chocolatey"
@@ -228,6 +240,12 @@ try {
         Assert-LogContains $ctx.Log "choco install typos -y" "Windows should install typos with Chocolatey"
         Assert-LogContains $ctx.Log "choco install delta -y" "Windows should install git-delta with Chocolatey"
         Assert-LogContains $ctx.Log "choco install file -y" "Windows should install file with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install just -y" "Windows should install just with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install difftastic -y" "Windows should install difftastic with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install pandoc -y" "Windows should install pandoc with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install imagemagick -y" "Windows should install ImageMagick with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install ffmpeg -y" "Windows should install ffmpeg with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install exiftool -y" "Windows should install exiftool with Chocolatey"
       }
     }
   }
