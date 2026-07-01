@@ -168,10 +168,14 @@ powershell -ExecutionPolicy Bypass -File windows.ps1 -InstallMissing
 When `-Manager` is not specified, Windows installs missing tools with the first
 available manager in this order: `winget`, Scoop, then Chocolatey.
 
-After an install attempt, the script checks whether the command is available on
-the current `PATH`. If the package manager reports success but the command is
-still unavailable, restart the shell or check package/app alias PATH entries.
-The summary's missing count is the count before install attempts.
+After an install attempt, the script refreshes its own `PATH` from the current
+Machine and User environment entries before checking whether the command is
+available. If a command is found only after that refresh, the summary notes that
+the parent shell may still need a restart or PATH refresh. If the package
+manager reports success, or reports that an installed package has no available
+upgrade, but the command is still unavailable after the refresh, check
+package/app alias PATH entries. The summary's missing count is the count before
+install attempts.
 
 Upgrade only tools already managed by winget, Scoop, or Chocolatey:
 

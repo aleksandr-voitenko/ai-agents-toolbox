@@ -211,25 +211,57 @@ function Add-FakeFailingInstallManager {
   }
 }
 
+function Add-FakeWingetAlreadyInstalledNoUpgradeManager {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "winget.cmd") -Lines @(
+    'echo winget %*>>"%FAKE_COMMAND_LOG%"',
+    'if /I "%1"=="install" echo Found an existing package already installed. Trying to upgrade the installed package...',
+    'if /I "%1"=="install" echo No available upgrade found.',
+    'if /I "%1"=="install" echo No newer package versions are available from the configured sources.',
+    'if /I "%1"=="install" exit /b -1978335189',
+    'if /I "%1"=="list" echo ripgrep BurntSushi.ripgrep.MSVC 15.0.0 winget',
+    'exit /b 0'
+  )
+}
+
 function Invoke-Setup {
   param(
     [pscustomobject]$Context,
     [hashtable]$Parameters = @{},
-    [string[]]$ExtraPaths = @()
+    [string[]]$ExtraPaths = @(),
+    [string[]]$RefreshPaths = @()
   )
 
   $oldPath = $env:Path
   $oldLog = $env:FAKE_COMMAND_LOG
+  $oldRefreshPath = $env:AI_AGENTS_TOOLBOX_WINDOWS_REFRESH_PATH
 
   try {
     $env:Path = (($ExtraPaths + $Context.Paths) -join [System.IO.Path]::PathSeparator)
     $env:FAKE_COMMAND_LOG = $Context.Log
+    if ($RefreshPaths.Count -gt 0) {
+      $env:AI_AGENTS_TOOLBOX_WINDOWS_REFRESH_PATH = ($RefreshPaths -join [System.IO.Path]::PathSeparator)
+    } else {
+      $env:AI_AGENTS_TOOLBOX_WINDOWS_REFRESH_PATH = (($ExtraPaths + $Context.Paths) -join [System.IO.Path]::PathSeparator)
+    }
     # windows.ps1 uses Write-Host for status lines, which PowerShell emits on the information stream.
     (& $SetupScript @Parameters *>&1 | Out-String)
   } finally {
     $env:Path = $oldPath
     $env:FAKE_COMMAND_LOG = $oldLog
+    $env:AI_AGENTS_TOOLBOX_WINDOWS_REFRESH_PATH = $oldRefreshPath
   }
+}
+
+function Invoke-SetupWithRefreshPathEntry {
+  param(
+    [pscustomobject]$Context,
+    [hashtable]$Parameters,
+    [string]$RefreshPathEntry
+  )
+
+  Invoke-Setup $Context $Parameters @() @($RefreshPathEntry)
 }
 
 function Run-Test {
@@ -280,7 +312,7 @@ try {
         Assert-LogContains $ctx.Log "winget install --id OliverBetz.ExifTool" "Windows should install exiftool with winget"
         Assert-LogNotContains $ctx.Log "winget install --id dandavison" "Windows should not use an unverified delta winget id"
         Assert-LogNotContains $ctx.Log "winget install --id typos" "Windows should not use an unverified typos winget id"
-        Assert-Contains $output "package manager reports install/upgrade completed" "Windows should explain when winget succeeds but the command remains unavailable"
+        Assert-Contains $output "Package manager reported install/upgrade completed" "Windows should explain when winget succeeds but the command remains unavailable"
         Assert-Contains $output "PATH entries." "Windows should hint at PATH and app alias fixes after winget succeeds without exposing the command"
       } elseif ($manager -eq "scoop") {
         Assert-LogContains $ctx.Log "scoop install ripgrep" "Windows should install ripgrep with Scoop"
@@ -402,6 +434,37 @@ try {
       Assert-Contains $message $manager "Windows should name the package manager whose install failed"
       Assert-Contains $message "exit code 23" "Windows should report the native installer exit code"
     }
+  }
+
+  Run-Test "Windows install-missing treats winget already-installed no-upgrade as nonfatal" {
+    $ctx = New-TestContext "winget-no-upgrade"
+    Add-FakeWingetAlreadyInstalledNoUpgradeManager $ctx.Bin
+
+    $output = Invoke-Setup $ctx @{ InstallMissing = $true; Manager = "winget" }
+
+    Assert-Contains $output "[missing] ripgrep" "Windows should report the command missing before the winget attempt"
+    Assert-Contains $output "No available upgrade found." "Windows should surface winget no-upgrade output"
+    Assert-Contains $output "Package manager reported install/upgrade completed" "Windows should still explain that the command remains unavailable"
+    Assert-Contains $output "Still unavailable after install attempts:" "Windows should include post-install availability summary"
+    Assert-NotContains $output "Install failed for ripgrep with winget package BurntSushi.ripgrep.MSVC" "Windows should not abort on winget already-installed no-upgrade"
+  }
+
+  Run-Test "Windows install-missing refreshes PATH before reporting unavailable commands" {
+    $ctx = New-TestContext "path-refresh"
+    $refreshedBin = Join-Path $ctx.Root "refreshed-bin"
+    New-Item -ItemType Directory -Force -Path $refreshedBin | Out-Null
+    Add-FakeWingetAlreadyInstalledNoUpgradeManager $ctx.Bin
+    Add-FakeTool $refreshedBin "rg"
+
+    $output = Invoke-SetupWithRefreshPathEntry $ctx @{ InstallMissing = $true; Manager = "winget" } $refreshedBin
+
+    Assert-Contains $output "[missing] ripgrep" "Windows should report ripgrep missing before install"
+    Assert-Contains $output "Available after PATH refresh in this script:" "Windows should report commands found after refreshing PATH"
+    Assert-Contains $output "ripgrep" "Windows should name the command found after PATH refresh"
+    Assert-Contains $output "The parent shell may need" "Windows should explain parent shell PATH staleness at the end"
+    Assert-Contains $output "PATH refresh before running them." "Windows should explain how to refresh parent shell PATH"
+    Assert-NotContains $output "WARNING: ripgrep:" "Windows should not print a per-tool warning for commands found after PATH refresh"
+    Assert-NotContains $output "unavailable after install attempts: ripgrep" "Windows should not include refreshed commands in the unavailable summary"
   }
 
   Run-Test "Windows upgrade-managed uses Scoop owner" {

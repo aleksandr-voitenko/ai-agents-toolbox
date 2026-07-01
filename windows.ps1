@@ -307,6 +307,64 @@ function Get-InstallManager {
   return $null
 }
 
+function Add-PathEntries {
+  param(
+    [System.Collections.Generic.List[string]]$Entries,
+    [hashtable]$Seen,
+    [string]$PathValue
+  )
+
+  if ([string]::IsNullOrEmpty($PathValue)) {
+    return
+  }
+
+  foreach ($entry in ($PathValue -split [System.IO.Path]::PathSeparator)) {
+    $trimmed = "$entry".Trim()
+    if (-not $trimmed) {
+      continue
+    }
+
+    $key = $trimmed.ToLowerInvariant()
+    if ($Seen.ContainsKey($key)) {
+      continue
+    }
+
+    [void]$Entries.Add($trimmed)
+    $Seen[$key] = $true
+  }
+}
+
+function Update-ProcessPathFromEnvironment {
+  $entries = [System.Collections.Generic.List[string]]::new()
+  $seen = @{}
+
+  Add-PathEntries $entries $seen $env:Path
+  # Tests and other controlled callers can provide a refresh source without
+  # reading the host's persisted PATH; normal runs use Machine and User PATH.
+  if ($null -ne $env:AI_AGENTS_TOOLBOX_WINDOWS_REFRESH_PATH) {
+    Add-PathEntries $entries $seen $env:AI_AGENTS_TOOLBOX_WINDOWS_REFRESH_PATH
+  } else {
+    Add-PathEntries $entries $seen ([Environment]::GetEnvironmentVariable("Path", "Machine"))
+    Add-PathEntries $entries $seen ([Environment]::GetEnvironmentVariable("Path", "User"))
+  }
+
+  $refreshedPath = $entries -join [System.IO.Path]::PathSeparator
+  if ($refreshedPath -ne $env:Path) {
+    $env:Path = $refreshedPath
+    return $true
+  }
+
+  return $false
+}
+
+function Test-WingetNoApplicableUpgradeExit {
+  param([int]$ExitCode)
+
+  # HRESULT 0x8A15002B is returned when `winget install` finds the
+  # package already installed, tries upgrade, and finds no newer version.
+  return $ExitCode -eq -1978335189
+}
+
 function Install-Tool {
   param(
     [string]$InstallManager,
@@ -318,6 +376,9 @@ function Install-Tool {
     winget install --id $Tool.Winget --exact --disable-interactivity --accept-source-agreements --accept-package-agreements
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
+      if (Test-WingetNoApplicableUpgradeExit $exitCode) {
+        return
+      }
       throw "Install failed for $($Tool.Name) with winget package $($Tool.Winget) (exit code $exitCode)."
     }
     return
@@ -425,6 +486,9 @@ $unmanagedCount = 0
 $failedVersionCount = 0
 $installAttemptCount = 0
 $postInstallUnavailableCount = 0
+$postInstallUnavailableTools = @()
+$postInstallPathRefreshCount = 0
+$postInstallPathRefreshTools = @()
 
 foreach ($tool in $Tools) {
   $cmd = Get-ToolCommand $tool.Commands
@@ -438,10 +502,22 @@ foreach ($tool in $Tools) {
       if ($InstallMissing) {
         $installAttemptCount++
         Install-Tool $installManager $tool
+        $didRefreshPath = $false
         $postInstallCmd = Get-ToolCommand $tool.Commands
         if ($null -eq $postInstallCmd) {
+          $didRefreshPath = Update-ProcessPathFromEnvironment
+          if ($didRefreshPath) {
+            $postInstallCmd = Get-ToolCommand $tool.Commands
+          }
+        }
+        if ($null -ne $postInstallCmd) {
+          if ($didRefreshPath) {
+            $postInstallPathRefreshCount++
+            $postInstallPathRefreshTools += $tool.Name
+          }
+        } else {
           $postInstallUnavailableCount++
-          Write-Warning "$($tool.Name): package manager reports install/upgrade completed, but command is still not available on PATH; restart the shell or check package/app alias PATH entries."
+          $postInstallUnavailableTools += $tool.Name
         }
       }
     } else {
@@ -492,9 +568,19 @@ Write-Host "  Missing before install: $missingCount"
 Write-Host "  Version checks failed:  $failedVersionCount"
 if ($InstallMissing -and $installAttemptCount -gt 0) {
   Write-Host "  Still unavailable after install attempts: $postInstallUnavailableCount"
+  if ($postInstallPathRefreshCount -gt 0) {
+    Write-Host "  Available after PATH refresh in this script: $postInstallPathRefreshCount"
+  }
 }
 if ($UpgradeManaged) {
   Write-Host "  Unmanaged upgrades skipped: $unmanagedCount"
+}
+if ($postInstallPathRefreshCount -gt 0) {
+  Write-Host ""
+  Write-Host "Note: command(s) became available after refreshing PATH inside this script: $($postInstallPathRefreshTools -join ', '). The parent shell may need a restart or PATH refresh before running them."
+}
+if ($postInstallUnavailableCount -gt 0) {
+  Write-Warning "$postInstallUnavailableCount command(s) are still unavailable after install attempts: $($postInstallUnavailableTools -join ', '). Package manager reported install/upgrade completed or no upgrade was needed; restart the shell or check package/app alias PATH entries."
 }
 if ($missingCount -gt 0 -and -not $InstallMissing) {
   Show-InstallHint
