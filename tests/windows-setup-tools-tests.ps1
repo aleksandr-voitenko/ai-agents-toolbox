@@ -117,6 +117,32 @@ function Add-FakeEmptyVersionTool {
   )
 }
 
+function Add-FakeMultiLineVersionTool {
+  param(
+    [string]$Directory,
+    [string]$CommandName
+  )
+
+  Write-CmdFile -Path (Join-Path $Directory "$CommandName.cmd") -Lines @(
+    'if /I not "%1"=="--version" exit /b 2',
+    "echo $CommandName 1.0",
+    "echo $CommandName build metadata",
+    "echo $CommandName extra version detail",
+    "exit /b 0"
+  )
+}
+
+function Add-FakePdftotextStderrVersionTool {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "pdftotext.cmd") -Lines @(
+    'if /I not "%1"=="-v" exit /b 2',
+    'echo pdftotext version 25.12.0 1>&2',
+    'echo Copyright 2005-2025 The Poppler Developers 1>&2',
+    'exit /b 0'
+  )
+}
+
 function Add-FakeManager {
   param(
     [string]$Directory,
@@ -142,6 +168,42 @@ function Add-FakeManager {
     "choco" {
       Write-CmdFile -Path (Join-Path $Directory "choco.cmd") -Lines @(
         'echo choco %*>>"%FAKE_COMMAND_LOG%"',
+        'if /I "%1"=="list" echo ripgrep^|15.0.0',
+        'exit /b 0'
+      )
+    }
+  }
+}
+
+function Add-FakeFailingInstallManager {
+  param(
+    [string]$Directory,
+    [ValidateSet("winget", "scoop", "choco")]
+    [string]$Manager,
+    [int]$ExitCode
+  )
+
+  switch ($Manager) {
+    "winget" {
+      Write-CmdFile -Path (Join-Path $Directory "winget.cmd") -Lines @(
+        'echo winget %*>>"%FAKE_COMMAND_LOG%"',
+        "if /I ""%1""==""install"" exit /b $ExitCode",
+        'if /I "%1"=="list" echo ripgrep BurntSushi.ripgrep.MSVC 15.0.0 winget',
+        'exit /b 0'
+      )
+    }
+    "scoop" {
+      Write-CmdFile -Path (Join-Path $Directory "scoop.cmd") -Lines @(
+        'echo scoop %*>>"%FAKE_COMMAND_LOG%"',
+        "if /I ""%1""==""install"" exit /b $ExitCode",
+        'if /I "%1"=="list" echo ripgrep 15.0.0',
+        'exit /b 0'
+      )
+    }
+    "choco" {
+      Write-CmdFile -Path (Join-Path $Directory "choco.cmd") -Lines @(
+        'echo choco %*>>"%FAKE_COMMAND_LOG%"',
+        "if /I ""%1""==""install"" exit /b $ExitCode",
         'if /I "%1"=="list" echo ripgrep^|15.0.0',
         'exit /b 0'
       )
@@ -218,6 +280,8 @@ try {
         Assert-LogContains $ctx.Log "winget install --id OliverBetz.ExifTool" "Windows should install exiftool with winget"
         Assert-LogNotContains $ctx.Log "winget install --id dandavison" "Windows should not use an unverified delta winget id"
         Assert-LogNotContains $ctx.Log "winget install --id typos" "Windows should not use an unverified typos winget id"
+        Assert-Contains $output "package manager reports install/upgrade completed" "Windows should explain when winget succeeds but the command remains unavailable"
+        Assert-Contains $output "PATH entries." "Windows should hint at PATH and app alias fixes after winget succeeds without exposing the command"
       } elseif ($manager -eq "scoop") {
         Assert-LogContains $ctx.Log "scoop install ripgrep" "Windows should install ripgrep with Scoop"
         Assert-LogContains $ctx.Log "scoop install sqlite" "Windows should install sqlite3 with Scoop"
@@ -274,6 +338,70 @@ try {
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail successful empty version checks"
     Assert-NotContains $output "version output empty" "Windows should prefer package metadata when it is available"
     Assert-NotContains $output "version check failed" "Windows should not report successful empty version output as failed"
+  }
+
+  Run-Test "Windows multiline version output uses first line without failing" {
+    $ctx = New-TestContext "multiline-version"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeMultiLineVersionTool $ctx.Bin "rg"
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   ripgrep" "Windows should find fake multiline ripgrep"
+    Assert-Contains $output "rg 1.0" "Windows should report the first useful version output line"
+    Assert-Contains $output "Version checks failed:  0" "Windows should not fail a successful multiline version command"
+    Assert-NotContains $output "rg build metadata" "Windows should not report later version output lines"
+    Assert-NotContains $output "version check failed" "Windows should not report successful multiline version output as failed"
+  }
+
+  Run-Test "Windows successful stderr version output is not a failure" {
+    $ctx = New-TestContext "stderr-version"
+    Add-FakePdftotextStderrVersionTool $ctx.Bin
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   pdftotext" "Windows should find fake pdftotext"
+    Assert-Contains $output "pdftotext version 25.12.0" "Windows should report successful stderr version output"
+    Assert-Contains $output "Version checks failed:  0" "Windows should not fail a successful stderr version command"
+    Assert-NotContains $output "version check failed" "Windows should not report successful stderr version output as failed"
+  }
+
+  Run-Test "Windows version checks invoke the discovered executable path" {
+    $ctx = New-TestContext "version-source-path"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeTool $ctx.Bin "rg"
+
+    try {
+      Set-Alias -Name "rg.cmd" -Value Get-Date -Scope Script
+      $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+    } finally {
+      if (Test-Path "Alias:rg.cmd") {
+        Remove-Item "Alias:rg.cmd" -Force
+      }
+    }
+
+    Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep despite an alias sharing the application name"
+    Assert-Contains $output "rg 1.0" "Windows should invoke the discovered executable path instead of the alias-shadowed command name"
+    Assert-Contains $output "Version checks failed:  0" "Windows should not fail when command-name re-resolution is shadowed"
+    Assert-NotContains $output "version check failed" "Windows should not report the alias-shadowed path check as failed"
+  }
+
+  foreach ($manager in @("winget", "scoop", "choco")) {
+    Run-Test "Windows install-missing surfaces $manager exit code" {
+      $ctx = New-TestContext "install-fails-$manager"
+      Add-FakeFailingInstallManager $ctx.Bin $manager 23
+
+      try {
+        Invoke-Setup $ctx @{ InstallMissing = $true; Manager = $manager } | Out-Null
+        Fail "Windows should fail when $manager install exits nonzero"
+      } catch {
+        $message = "$_"
+      }
+
+      Assert-Contains $message "Install failed for ripgrep" "Windows should name the tool whose install failed"
+      Assert-Contains $message $manager "Windows should name the package manager whose install failed"
+      Assert-Contains $message "exit code 23" "Windows should report the native installer exit code"
+    }
   }
 
   Run-Test "Windows upgrade-managed uses Scoop owner" {

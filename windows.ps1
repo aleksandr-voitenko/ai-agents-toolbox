@@ -170,41 +170,61 @@ function Get-ToolSource {
   return "unknown"
 }
 
-function Get-VersionLine {
+function Get-VersionArguments {
   param([string]$CommandName)
 
+  $baseName = [System.IO.Path]::GetFileNameWithoutExtension($CommandName)
+
+  if ($baseName -like "gswin*c" -or $baseName -eq "gs") {
+    return @("--version")
+  }
+  if ($baseName -eq "pdftotext") {
+    return @("-v")
+  }
+  if ($baseName -eq "ffmpeg") {
+    return @("-version")
+  }
+  if ($baseName -eq "exiftool") {
+    return @("-ver")
+  }
+
+  return @("--version")
+}
+
+function Get-VersionLine {
+  param([System.Management.Automation.CommandInfo]$Command)
+
+  $commandName = [System.IO.Path]::GetFileName($Command.Source)
+  if (-not $commandName) {
+    $commandName = $Command.Name
+  }
+
   try {
-    if ($CommandName -eq "tree.com" -or $CommandName -eq "tree.exe" -or $CommandName -eq "tree") {
+    if ($commandName -eq "tree.com" -or $commandName -eq "tree.exe" -or $commandName -eq "tree") {
       return "Windows tree command"
     }
-    if ($CommandName -like "gswin*c.exe" -or $CommandName -eq "gs.exe" -or $CommandName -eq "gs") {
-      $output = & $CommandName --version 2>&1 | Select-Object -First 1
-      if ($LASTEXITCODE -ne 0) { return "version check failed" }
-      if ($null -eq $output) { return "" }
-      return $output
+
+    $commandPath = $Command.Source
+    if (-not $commandPath) {
+      $commandPath = $Command.Name
     }
-    if ($CommandName -eq "pdftotext.exe" -or $CommandName -eq "pdftotext") {
-      $output = & $CommandName -v 2>&1 | Select-Object -First 1
-      if ($LASTEXITCODE -ne 0) { return "version check failed" }
-      if ($null -eq $output) { return "" }
-      return $output
+
+    $versionArguments = @(Get-VersionArguments $commandName)
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+      # Some Windows-native version probes, including Poppler's pdftotext,
+      # print their successful version banner on stderr.
+      $output = & $commandPath @versionArguments 2>&1
+      $exitCode = $LASTEXITCODE
+    } finally {
+      $ErrorActionPreference = $previousErrorActionPreference
     }
-    if ($CommandName -eq "ffmpeg.exe" -or $CommandName -eq "ffmpeg") {
-      $output = & $CommandName -version 2>&1 | Select-Object -First 1
-      if ($LASTEXITCODE -ne 0) { return "version check failed" }
-      if ($null -eq $output) { return "" }
-      return $output
-    }
-    if ($CommandName -eq "exiftool.exe" -or $CommandName -eq "exiftool") {
-      $output = & $CommandName -ver 2>&1 | Select-Object -First 1
-      if ($LASTEXITCODE -ne 0) { return "version check failed" }
-      if ($null -eq $output) { return "" }
-      return $output
-    }
-    $output = & $CommandName --version 2>&1 | Select-Object -First 1
-    if ($LASTEXITCODE -ne 0) { return "version check failed" }
-    if ($null -eq $output) { return "" }
-    return $output
+    if ($exitCode -ne 0) { return "version check failed" }
+
+    $line = $output | Where-Object { "$_".Trim().Length -gt 0 } | Select-Object -First 1
+    if ($null -eq $line) { return "" }
+    return "$line".Trim()
   } catch {
     return "version check failed"
   }
@@ -296,18 +316,30 @@ function Install-Tool {
   if ($InstallManager -eq "winget") {
     Write-Host "Installing $($Tool.Name) with winget..."
     winget install --id $Tool.Winget --exact --disable-interactivity --accept-source-agreements --accept-package-agreements
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+      throw "Install failed for $($Tool.Name) with winget package $($Tool.Winget) (exit code $exitCode)."
+    }
     return
   }
 
   if ($InstallManager -eq "scoop") {
     Write-Host "Installing $($Tool.Name) with scoop..."
     scoop install $Tool.Scoop
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+      throw "Install failed for $($Tool.Name) with scoop package $($Tool.Scoop) (exit code $exitCode)."
+    }
     return
   }
 
   if ($InstallManager -eq "choco") {
     Write-Host "Installing $($Tool.Name) with Chocolatey..."
     choco install $Tool.Choco -y
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+      throw "Install failed for $($Tool.Name) with choco package $($Tool.Choco) (exit code $exitCode)."
+    }
     return
   }
 
@@ -391,6 +423,8 @@ Write-Host ""
 $missingCount = 0
 $unmanagedCount = 0
 $failedVersionCount = 0
+$installAttemptCount = 0
+$postInstallUnavailableCount = 0
 
 foreach ($tool in $Tools) {
   $cmd = Get-ToolCommand $tool.Commands
@@ -402,7 +436,13 @@ foreach ($tool in $Tools) {
     if ($installManager) {
       Write-Host ("[missing] {0,-14} package manager: {1}" -f $tool.Name, $installManager)
       if ($InstallMissing) {
+        $installAttemptCount++
         Install-Tool $installManager $tool
+        $postInstallCmd = Get-ToolCommand $tool.Commands
+        if ($null -eq $postInstallCmd) {
+          $postInstallUnavailableCount++
+          Write-Warning "$($tool.Name): package manager reports install/upgrade completed, but command is still not available on PATH; restart the shell or check package/app alias PATH entries."
+        }
       }
     } else {
       Write-Host ("[missing] {0,-14} package manager: unavailable or no package mapping" -f $tool.Name)
@@ -411,7 +451,7 @@ foreach ($tool in $Tools) {
   }
 
   $source = Get-ToolSource $cmd.Source $tool
-  $version = Get-VersionLine $cmd.Name
+  $version = Get-VersionLine $cmd
   if ($tool.Name -eq "yarn" -and $version -eq "version check failed" -and $source -eq "npm-or-node") {
     $version = "corepack shim; version is selected per project"
   } elseif ($null -ne $version -and $version.Length -eq 0) {
@@ -450,6 +490,9 @@ Write-Host ""
 Write-Host "Summary:"
 Write-Host "  Missing before install: $missingCount"
 Write-Host "  Version checks failed:  $failedVersionCount"
+if ($InstallMissing -and $installAttemptCount -gt 0) {
+  Write-Host "  Still unavailable after install attempts: $postInstallUnavailableCount"
+}
 if ($UpgradeManaged) {
   Write-Host "  Unmanaged upgrades skipped: $unmanagedCount"
 }
