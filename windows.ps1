@@ -54,7 +54,7 @@ $Tools = @(
   @{ Name = "eza"; Commands = @("eza.exe", "eza"); Winget = "eza-community.eza"; Scoop = "eza"; Choco = "eza" },
   @{ Name = "fzf"; Commands = @("fzf.exe", "fzf"); Winget = "junegunn.fzf"; Scoop = "fzf"; Choco = "fzf" },
   @{ Name = "tree"; Commands = @("tree.com", "tree.exe", "tree"); Winget = $null; Scoop = "tree"; Choco = "tree" },
-  @{ Name = "file"; Commands = @("file.exe", "file"); Winget = "GnuWin32.File"; Scoop = "file"; Choco = "file" },
+  @{ Name = "file"; Commands = @("file.exe", "file"); Winget = $null; Scoop = "file"; Choco = "file" },
   @{ Name = "pandoc"; Commands = @("pandoc.exe", "pandoc"); Winget = "JohnMacFarlane.Pandoc"; Scoop = "pandoc"; Choco = "pandoc" },
   @{ Name = "imagemagick"; Commands = @("magick.exe", "magick"); Winget = "ImageMagick.ImageMagick"; Scoop = "imagemagick"; Choco = "imagemagick" },
   @{ Name = "ffmpeg"; Commands = @("ffmpeg.exe", "ffmpeg"); Winget = "Gyan.FFmpeg"; Scoop = "ffmpeg"; Choco = "ffmpeg" },
@@ -62,7 +62,7 @@ $Tools = @(
   @{ Name = "hyperfine"; Commands = @("hyperfine.exe", "hyperfine"); Winget = "sharkdp.hyperfine"; Scoop = "hyperfine"; Choco = "hyperfine" },
   @{ Name = "shellcheck"; Commands = @("shellcheck.exe", "shellcheck"); Winget = "koalaman.shellcheck"; Scoop = "shellcheck"; Choco = "shellcheck" },
   @{ Name = "shfmt"; Commands = @("shfmt.exe", "shfmt"); Winget = "mvdan.shfmt"; Scoop = "shfmt"; Choco = "shfmt" },
-  @{ Name = "ghostscript"; Commands = @("gswin64c.exe", "gswin32c.exe", "gs.exe", "gs"); Winget = "ArtifexSoftware.Ghostscript"; Scoop = "ghostscript"; Choco = "ghostscript" },
+  @{ Name = "ghostscript"; Commands = @("gswin64c.exe", "gswin32c.exe", "gs.exe", "gs"); Winget = $null; Scoop = "ghostscript"; Choco = "ghostscript" },
   @{ Name = "pdftotext"; Commands = @("pdftotext.exe", "pdftotext"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler" }
 )
 

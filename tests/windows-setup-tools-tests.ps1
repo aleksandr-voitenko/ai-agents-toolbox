@@ -303,7 +303,6 @@ try {
         Assert-LogContains $ctx.Log "winget install --id SQLite.SQLite" "Windows should install sqlite3 with winget"
         Assert-LogContains $ctx.Log "winget install --id MikeFarah.yq" "Windows should install yq with winget"
         Assert-LogContains $ctx.Log "winget install --id rhysd.actionlint" "Windows should install actionlint with winget"
-        Assert-LogContains $ctx.Log "winget install --id GnuWin32.File" "Windows should install file with winget"
         Assert-LogContains $ctx.Log "winget install --id Casey.Just" "Windows should install just with winget"
         Assert-LogContains $ctx.Log "winget install --id Wilfred.difftastic" "Windows should install difftastic with winget"
         Assert-LogContains $ctx.Log "winget install --id JohnMacFarlane.Pandoc" "Windows should install pandoc with winget"
@@ -312,6 +311,8 @@ try {
         Assert-LogContains $ctx.Log "winget install --id OliverBetz.ExifTool" "Windows should install exiftool with winget"
         Assert-LogNotContains $ctx.Log "winget install --id dandavison" "Windows should not use an unverified delta winget id"
         Assert-LogNotContains $ctx.Log "winget install --id typos" "Windows should not use an unverified typos winget id"
+        Assert-LogNotContains $ctx.Log "winget install --id GnuWin32.File" "Windows should not use the GnuWin32 file winget package"
+        Assert-LogNotContains $ctx.Log "winget install --id ArtifexSoftware.Ghostscript" "Windows should not use an unavailable Ghostscript winget id"
         Assert-Contains $output "Package manager reported install/upgrade completed" "Windows should explain when winget succeeds but the command remains unavailable"
         Assert-Contains $output "PATH entries." "Windows should hint at PATH and app alias fixes after winget succeeds without exposing the command"
       } elseif ($manager -eq "scoop") {
@@ -344,6 +345,21 @@ try {
         Assert-LogContains $ctx.Log "choco install exiftool -y" "Windows should install exiftool with Chocolatey"
       }
     }
+  }
+
+  Run-Test "Windows auto install uses Scoop for tools without reliable winget packages" {
+    $ctx = New-TestContext "auto-scoop-fallback"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeManager $ctx.Bin "scoop"
+
+    $output = Invoke-Setup $ctx @{ InstallMissing = $true }
+
+    Assert-Contains $output "[missing] file           package manager: scoop" "Windows auto mode should choose Scoop for file"
+    Assert-Contains $output "[missing] ghostscript    package manager: scoop" "Windows auto mode should choose Scoop for Ghostscript"
+    Assert-LogContains $ctx.Log "scoop install file" "Windows should install file with Scoop when winget is unreliable"
+    Assert-LogContains $ctx.Log "scoop install ghostscript" "Windows should install Ghostscript with Scoop when winget is unavailable"
+    Assert-LogNotContains $ctx.Log "winget install --id GnuWin32.File" "Windows should not choose the old GnuWin32 file winget package in auto mode"
+    Assert-LogNotContains $ctx.Log "winget install --id ArtifexSoftware.Ghostscript" "Windows should not choose the unavailable Ghostscript winget id in auto mode"
   }
 
   Run-Test "Windows upgrade-managed uses winget owner" {
