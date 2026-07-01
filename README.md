@@ -1,10 +1,9 @@
 ## The idea
 This is your AI agent on a normal developer machine: ready to help, but still looking around for the tools it needs.
 
-**AI Agents Toolbox** helps fix that. It checks what’s already installed, points out what’s missing, and can install the essentials through the package manager you already use.
-
 <img width="640" height="360" alt="Cartoon-style workshop scene showing a confused craftsman in overalls pulling out his empty pockets while looking for missing tools." src="https://github.com/user-attachments/assets/7770f5e2-0454-403e-8634-6c93f45b7ba9" />
 
+**AI Agents Toolbox** helps fix that. It checks what’s already installed, points out what’s missing, and can install the essentials through the package manager you already use.
 
 ## Why This Exists
 
