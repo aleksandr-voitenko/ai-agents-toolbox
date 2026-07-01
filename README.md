@@ -1,5 +1,7 @@
-## The intent
-This is your AI agent on a typical developer machine: eager to help, but missing half the tools it needs. The AI Agents Toolbox project aims to solve this problem for you. 
+## The idea
+This is your AI agent on a normal developer machine: ready to help, but still looking around for the tools it needs.
+
+**AI Agents Toolbox** helps fix that. It checks what’s already installed, points out what’s missing, and can install the essentials through the package manager you already use.
 
 <img width="640" height="360" alt="Cartoon-style workshop scene showing a confused craftsman in overalls pulling out his empty pockets while looking for missing tools." src="https://github.com/user-attachments/assets/7770f5e2-0454-403e-8634-6c93f45b7ba9" />
 
@@ -11,6 +13,9 @@ fast search, JSON and YAML processors, GitHub workflow checks, formatters,
 shell linters, PDF utilities, and the little CLI helpers that turn "one quick
 change" into actual momentum.
 
+Instead of stopping every few minutes to install one more thing, your agent can
+start from a machine that is actually ready for development.
+
 This toolbox gives any AI agent (or a developer) a quick, conservative way to check
 a machine and optionally install the missing essentials through a package manager
 they already use. Try it when a fresh laptop, container, or borrowed workstation
@@ -21,41 +26,41 @@ scavenger hunt.
 
 The scripts manage these logical tools across supported platforms:
 
-```text
-ripgrep (rg) - Fast recursive text searcher with Git-aware defaults.
-fd - Fast filesystem search alternative to find.
-jq - Command-line JSON processor for querying and transforming structured data.
-curl - URL client for HTTP requests, downloads, and install bootstrapping.
-sqlite3 - Command-line shell for inspecting and managing SQLite databases.
-yq - Command-line YAML, JSON, XML, TOML, and properties processor.
-actionlint - Static checker for GitHub Actions workflow files.
-typos - Source-code-aware spell checker for code, docs, and config files.
-clang-format - Source formatter for C, C++, Objective-C, Java, JavaScript, and related languages.
-gh - GitHub CLI for repository, pull request, issue, and workflow operations.
-git - Distributed version control CLI.
-git-delta (delta) - Syntax-highlighting pager for Git and diff output.
-just - Command runner for project-local recipes and repeatable tasks.
-difftastic (difft) - Syntax-aware structural diff tool.
-node - JavaScript runtime for local tooling and application scripts.
-yarn - JavaScript package manager and project script runner.
-python - Python runtime for scripts, tests, and developer utilities.
-cmake - Cross-platform build system generator.
-ninja - Small, fast build executor commonly used with CMake.
-bat - Syntax-highlighting file viewer and cat replacement.
-eza - Modern directory listing tool and ls replacement.
-fzf - Interactive fuzzy finder for shells and scripts.
-tree - Recursive directory tree viewer.
-file - File type detector based on content signatures.
-pandoc - Universal document converter for markup and publishing workflows.
-imagemagick (magick/convert) - Image inspection and conversion toolkit.
-ffmpeg - Audio and video recording, conversion, and inspection toolkit.
-exiftool - Metadata reader and writer for images, media, and documents.
-hyperfine - Command-line benchmarking tool.
-shellcheck - Static analyzer for shell scripts.
-shfmt - Formatter for shell scripts.
-ghostscript (gs) - PostScript and PDF interpreter used by document workflows.
-pdftotext - PDF text extraction tool from Poppler.
-```
+| Tool | Description |
+| --- | --- |
+| `ripgrep` (`rg`) | Fast recursive text searcher with Git-aware defaults. |
+| `fd` | Fast filesystem search alternative to find. |
+| `jq` | Command-line JSON processor for querying and transforming structured data. |
+| `curl` | URL client for HTTP requests, downloads, and install bootstrapping. |
+| `sqlite3` | Command-line shell for inspecting and managing SQLite databases. |
+| `yq` | Command-line YAML, JSON, XML, TOML, and properties processor. |
+| `actionlint` | Static checker for GitHub Actions workflow files. |
+| `typos` | Source-code-aware spell checker for code, docs, and config files. |
+| `clang-format` | Source formatter for C, C++, Objective-C, Java, JavaScript, and related languages. |
+| `gh` | GitHub CLI for repository, pull request, issue, and workflow operations. |
+| `git` | Distributed version control CLI. |
+| `git-delta` (`delta`) | Syntax-highlighting pager for Git and diff output. |
+| `just` | Command runner for project-local recipes and repeatable tasks. |
+| `difftastic` (`difft`) | Syntax-aware structural diff tool. |
+| `node` | JavaScript runtime for local tooling and application scripts. |
+| `yarn` | JavaScript package manager and project script runner. |
+| `python` | Python runtime for scripts, tests, and developer utilities. |
+| `cmake` | Cross-platform build system generator. |
+| `ninja` | Small, fast build executor commonly used with CMake. |
+| `bat` | Syntax-highlighting file viewer and cat replacement. |
+| `eza` | Modern directory listing tool and ls replacement. |
+| `fzf` | Interactive fuzzy finder for shells and scripts. |
+| `tree` | Recursive directory tree viewer. |
+| `file` | File type detector based on content signatures. |
+| `pandoc` | Universal document converter for markup and publishing workflows. |
+| `imagemagick` (`magick`/`convert`) | Image inspection and conversion toolkit. |
+| `ffmpeg` | Audio and video recording, conversion, and inspection toolkit. |
+| `exiftool` | Metadata reader and writer for images, media, and documents. |
+| `hyperfine` | Command-line benchmarking tool. |
+| `shellcheck` | Static analyzer for shell scripts. |
+| `shfmt` | Formatter for shell scripts. |
+| `ghostscript` (`gs`) | PostScript and PDF interpreter used by document workflows. |
+| `pdftotext` | PDF text extraction tool from Poppler. |
 
 Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
