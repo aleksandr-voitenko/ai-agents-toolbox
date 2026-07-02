@@ -343,6 +343,35 @@ function Get-InstallManager {
   return $null
 }
 
+function Get-ToolMappedManagers {
+  param([hashtable]$Tool)
+
+  $mapped = @()
+  if ($Tool.Winget) { $mapped += "winget" }
+  if ($Tool.Scoop) { $mapped += "scoop" }
+  if ($Tool.Choco) { $mapped += "choco" }
+  return $mapped
+}
+
+function Format-ManagerName {
+  param([string]$Manager)
+
+  if ($Manager -eq "scoop") { return "Scoop" }
+  if ($Manager -eq "choco") { return "Chocolatey" }
+  return $Manager
+}
+
+function Format-ManagerList {
+  param([string[]]$Managers)
+
+  $names = @($Managers | ForEach-Object { Format-ManagerName $_ })
+  if ($names.Count -eq 0) { return "" }
+  if ($names.Count -eq 1) { return $names[0] }
+  if ($names.Count -eq 2) { return "$($names[0]) or $($names[1])" }
+
+  return "$(($names[0..($names.Count - 2)]) -join ', '), or $($names[-1])"
+}
+
 function Add-PathEntries {
   param(
     [System.Collections.Generic.List[string]]$Entries,
@@ -525,6 +554,7 @@ $postInstallUnavailableCount = 0
 $postInstallUnavailableTools = @()
 $postInstallPathRefreshCount = 0
 $postInstallPathRefreshTools = @()
+$differentManagerTools = @()
 
 foreach ($tool in $Tools) {
   $cmd = Get-ToolCommand $tool.Commands $tool
@@ -557,7 +587,19 @@ foreach ($tool in $Tools) {
         }
       }
     } else {
-      Write-Host ("[missing] {0,-14} package manager: unavailable or no package mapping" -f $tool.Name)
+      $mappedManagers = @(Get-ToolMappedManagers $tool)
+      $alternateManagers = @($mappedManagers | Where-Object { $availableManagers -notcontains $_ })
+      if ($availableManagers.Count -gt 0 -and $alternateManagers.Count -gt 0) {
+        Write-Host ("[missing] {0,-14} package not available via detected manager(s)" -f $tool.Name)
+        $differentManagerTools += [pscustomobject]@{
+          Name = $tool.Name
+          Managers = $alternateManagers
+        }
+      } elseif ($mappedManagers.Count -eq 0) {
+        Write-Host ("[missing] {0,-14} package has no supported Windows mapping" -f $tool.Name)
+      } else {
+        Write-Host ("[missing] {0,-14} package manager: none detected" -f $tool.Name)
+      }
     }
     continue
   }
@@ -614,6 +656,13 @@ if ($UpgradeManaged) {
 if ($postInstallPathRefreshCount -gt 0) {
   Write-Host ""
   Write-Host "Note: command(s) became available after refreshing PATH inside this script: $($postInstallPathRefreshTools -join ', '). The parent shell may need a restart or PATH refresh before running them."
+}
+if ($differentManagerTools.Count -gt 0) {
+  Write-Host ""
+  Write-Host "Some missing tools need a different package manager:"
+  foreach ($item in $differentManagerTools) {
+    Write-Host "  $($item.Name): available via $(Format-ManagerList $item.Managers)"
+  }
 }
 if ($postInstallUnavailableCount -gt 0) {
   Write-Warning "$postInstallUnavailableCount command(s) are still unavailable after install attempts: $($postInstallUnavailableTools -join ', '). Package manager reported install/upgrade completed or no upgrade was needed; restart the shell or check package/app alias PATH entries."

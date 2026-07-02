@@ -322,6 +322,10 @@ try {
         Assert-LogNotContains $ctx.Log "winget install --id typos" "Windows should not use an unverified typos winget id"
         Assert-LogNotContains $ctx.Log "winget install --id GnuWin32.File" "Windows should not use the GnuWin32 file winget package"
         Assert-LogNotContains $ctx.Log "winget install --id ArtifexSoftware.Ghostscript" "Windows should not use an unavailable Ghostscript winget id"
+        Assert-Contains $output "[missing] file           package not available via detected manager(s)" "Windows should explain when a tool is not installable through detected managers"
+        Assert-Contains $output "Some missing tools need a different package manager:" "Windows should summarize tools that need another package manager"
+        Assert-Contains $output "file: available via Scoop or Chocolatey" "Windows should name alternate managers for file"
+        Assert-Contains $output "ghostscript: available via Scoop or Chocolatey" "Windows should name alternate managers for Ghostscript"
         Assert-Contains $output "Package manager reported install/upgrade completed" "Windows should explain when winget succeeds but the command remains unavailable"
         Assert-Contains $output "PATH entries." "Windows should hint at PATH and app alias fixes after winget succeeds without exposing the command"
       } elseif ($manager -eq "scoop") {
