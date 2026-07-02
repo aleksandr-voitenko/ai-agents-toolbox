@@ -143,6 +143,15 @@ function Add-FakePdftotextStderrVersionTool {
   )
 }
 
+function Add-FakePythonWindowsAppsAlias {
+  param([string]$Root)
+
+  $windowsApps = Join-Path $Root "AppData\Local\Microsoft\WindowsApps"
+  New-Item -ItemType Directory -Force -Path $windowsApps | Out-Null
+  Set-Content -Path (Join-Path $windowsApps "python.exe") -Encoding ASCII -Value "not a real executable"
+  return $windowsApps
+}
+
 function Add-FakeManager {
   param(
     [string]$Directory,
@@ -412,6 +421,18 @@ try {
     Assert-Contains $output "pdftotext version 25.12.0" "Windows should report successful stderr version output"
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail a successful stderr version command"
     Assert-NotContains $output "version check failed" "Windows should not report successful stderr version output as failed"
+  }
+
+  Run-Test "Windows ignores unusable Python WindowsApps alias" {
+    $ctx = New-TestContext "python-windowsapps-alias"
+    Add-FakeManager $ctx.Bin "winget"
+    $windowsApps = Add-FakePythonWindowsAppsAlias $ctx.Root
+
+    $output = Invoke-Setup $ctx @{ InstallMissing = $true; Manager = "winget" } @($windowsApps)
+
+    Assert-Contains $output "[missing] python         package manager: winget" "Windows should not treat the Store Python alias as an installed runtime"
+    Assert-LogContains $ctx.Log "winget install --id Python.Python.3" "Windows should install Python when only the Store alias is present"
+    Assert-NotContains $output "[found]   python" "Windows should not report the Store Python alias as found"
   }
 
   Run-Test "Windows version checks invoke the discovered executable path" {

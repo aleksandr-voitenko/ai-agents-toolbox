@@ -71,12 +71,48 @@ function Test-CommandExists {
   return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Test-WindowsPythonAppExecutionAlias {
+  param([System.Management.Automation.CommandInfo]$Command)
+
+  $source = $Command.Source
+  if (-not $source) {
+    return $false
+  }
+
+  $baseName = [System.IO.Path]::GetFileNameWithoutExtension($source)
+  $normalized = $source.ToLowerInvariant()
+  return (($baseName -eq "python" -or $baseName -eq "python3") -and $normalized -like "*\microsoft\windowsapps\*")
+}
+
+function Test-ToolCommandUsable {
+  param(
+    [hashtable]$Tool,
+    [System.Management.Automation.CommandInfo]$Command
+  )
+
+  if ($null -ne $Tool -and $Tool.Name -eq "python" -and (Test-WindowsPythonAppExecutionAlias $Command)) {
+    # The Windows Store App Execution Alias looks like python.exe on PATH even
+    # when it only redirects users to install Python. Keep it only if it can
+    # answer the same version probe as a real runtime.
+    $version = Get-VersionLine $Command
+    return ($version -and $version -ne "version check failed")
+  }
+
+  return $true
+}
+
 function Get-ToolCommand {
-  param([string[]]$Commands)
+  param(
+    [string[]]$Commands,
+    [hashtable]$Tool = $null
+  )
 
   foreach ($candidate in $Commands) {
     $cmd = Get-Command $candidate -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $cmd) {
+      if (-not (Test-ToolCommandUsable $Tool $cmd)) {
+        continue
+      }
       return $cmd
     }
   }
@@ -491,7 +527,7 @@ $postInstallPathRefreshCount = 0
 $postInstallPathRefreshTools = @()
 
 foreach ($tool in $Tools) {
-  $cmd = Get-ToolCommand $tool.Commands
+  $cmd = Get-ToolCommand $tool.Commands $tool
 
   if ($null -eq $cmd) {
     $missingCount++
@@ -503,11 +539,11 @@ foreach ($tool in $Tools) {
         $installAttemptCount++
         Install-Tool $installManager $tool
         $didRefreshPath = $false
-        $postInstallCmd = Get-ToolCommand $tool.Commands
+        $postInstallCmd = Get-ToolCommand $tool.Commands $tool
         if ($null -eq $postInstallCmd) {
           $didRefreshPath = Update-ProcessPathFromEnvironment
           if ($didRefreshPath) {
-            $postInstallCmd = Get-ToolCommand $tool.Commands
+            $postInstallCmd = Get-ToolCommand $tool.Commands $tool
           }
         }
         if ($null -ne $postInstallCmd) {
