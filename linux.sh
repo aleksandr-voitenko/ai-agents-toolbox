@@ -323,6 +323,14 @@ install_package() {
       run_package_command pacman -S --needed --noconfirm "$package"
       ;;
     zypper)
+      if run_package_command zypper install -y "$package"; then
+        return 0
+      fi
+      # Tumbleweed mirrors can roll package files out from under newly built
+      # metadata. Rebuild metadata only after a failed install so the common
+      # path avoids the full refresh that has been flaky on hosted runners.
+      echo "zypper install failed for $package; rebuilding metadata and retrying."
+      run_package_command zypper clean --metadata
       run_package_command zypper install -y "$package"
       ;;
     *)

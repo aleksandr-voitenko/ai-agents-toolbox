@@ -48,6 +48,27 @@ assert_log_contains() {
   fi
 }
 
+assert_log_line_count() {
+  local log_file="$1"
+  local needle="$2"
+  local expected="$3"
+  local label="$4"
+  local actual=0
+
+  if [ -f "$log_file" ]; then
+    actual="$(grep -F -c "$needle" "$log_file" || true)"
+  fi
+
+  if [ "$actual" -ne "$expected" ]; then
+    echo "Expected command log to contain $expected instances of: $needle" >&2
+    echo "Found: $actual" >&2
+    if [ -f "$log_file" ]; then
+      cat "$log_file" >&2
+    fi
+    fail "$label"
+  fi
+}
+
 assert_log_not_contains() {
   local log_file="$1"
   local needle="$2"
@@ -181,6 +202,21 @@ add_fake_linux_manager() {
       fail "unsupported fake Linux manager: $manager"
       ;;
   esac
+}
+
+add_fake_flaky_zypper_manager() {
+  local bin_dir="$1"
+  write_executable "$bin_dir/zypper" \
+    'printf "zypper %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    'case "$*" in' \
+    '  "install -y ripgrep")' \
+    '    if [ ! -f "$FAKE_ZYPPER_FAILED_ONCE" ]; then' \
+    '      printf "The requested URL returned error: 404\n" >&2' \
+    '      : > "$FAKE_ZYPPER_FAILED_ONCE"' \
+    '      exit 4' \
+    '    fi' \
+    '    ;;' \
+    'esac'
 }
 
 add_fake_github_release_installers() {
@@ -398,6 +434,24 @@ test_linux_install_missing_uses_selected_managers() {
       assert_log_contains "$log" "DEBIAN_FRONTEND=noninteractive" "apt installs should run noninteractively"
     fi
   done
+}
+
+test_linux_zypper_rebuilds_metadata_after_install_failure() {
+  local dir bin log output
+  dir="$(new_case_dir linux-zypper-stale-metadata)"
+  bin="$dir/bin"
+  log="$dir/commands.log"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_flaky_zypper_manager "$bin"
+  add_fake_github_release_installers "$bin"
+
+  FAKE_COMMAND_LOG="$log" FAKE_ZYPPER_FAILED_ONCE="$dir/zypper-failed-once" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --manager zypper --install-missing
+
+  assert_contains "$output" "zypper install failed for ripgrep; rebuilding metadata and retrying." "linux should explain zypper metadata recovery"
+  assert_log_line_count "$log" "zypper install -y ripgrep" 2 "linux should retry the failed zypper install once"
+  assert_log_contains "$log" "zypper clean --metadata" "linux should rebuild stale zypper metadata before retrying"
+  assert_log_contains "$log" "zypper install -y fd" "linux should keep installing after zypper recovery"
 }
 
 test_linux_github_release_downloads_use_token_when_available() {
@@ -619,6 +673,7 @@ run_test() {
 
 run_test "linux check-only does not install" test_linux_check_only_does_not_install
 run_test "linux install-missing uses selected managers" test_linux_install_missing_uses_selected_managers
+run_test "linux zypper rebuilds metadata after install failure" test_linux_zypper_rebuilds_metadata_after_install_failure
 run_test "linux GitHub release downloads use token" test_linux_github_release_downloads_use_token_when_available
 run_test "linux empty successful version output is not a failure" test_linux_empty_successful_version_output_is_not_a_failure
 run_test "linux finds vendor_perl ExifTool" test_linux_finds_vendor_perl_exiftool
