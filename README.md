@@ -69,31 +69,61 @@ ImageMagick, and ExifTool under distribution-specific names or paths.
 
 ## One-Line Installers
 
-macOS, using the default `curl`:
+### macOS
+
+Install Homebrew if you do not have it:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Optionally get a report about missing and available tools:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh)"
+```
+
+Automatically install missing tools:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh | bash -s -- --install-missing
 ```
 
-Linux, using `curl`:
+### Linux
+
+Install `curl` via package manager, if you do not have it.
+
+Optionally get a report about missing and available tools:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --check-only
+```
+
+Automatically install missing tools:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --install-missing
 ```
 
-Linux, using `wget`:
+### Windows
 
-```sh
-wget -qO- https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --install-missing
+Use PowerShell.
+
+Optionally get a report about missing and available tools:
+
+```powershell
+irm https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/windows.ps1 | iex
 ```
 
-Windows, using PowerShell:
+Automatically install missing tools:
 
 ```powershell
 $u="https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/windows.ps1"; $f=Join-Path $env:TEMP "ai-agents-toolbox-windows.ps1"; Invoke-WebRequest -UseBasicParsing $u -OutFile $f; powershell -ExecutionPolicy Bypass -File $f -InstallMissing
 ```
 
-## macOS
+## Options
+
+### macOS
 
 Check only:
 
@@ -113,7 +143,7 @@ Upgrade only tools already managed by Homebrew:
 ./macos.sh --upgrade-managed
 ```
 
-## Linux
+### Linux
 
 Check only:
 
@@ -151,7 +181,7 @@ pacman   Arch Linux
 zypper   openSUSE
 ```
 
-## Windows
+### Windows
 
 Check only:
 
