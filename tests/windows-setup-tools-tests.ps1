@@ -267,8 +267,10 @@ function Invoke-Setup {
     } else {
       $env:AI_AGENTS_TOOLBOX_WINDOWS_REFRESH_PATH = (($ExtraPaths + $Context.Paths) -join [System.IO.Path]::PathSeparator)
     }
-    # windows.ps1 uses Write-Host for status lines, which PowerShell emits on the information stream.
-    (& $SetupScript @Parameters *>&1 | Out-String)
+    # windows.ps1 uses Write-Host for status lines, which PowerShell emits on the
+    # information stream. Use a fixed wide capture so console width does not wrap
+    # report rows before assertions inspect them.
+    (& $SetupScript @Parameters *>&1 | Out-String -Width 4096)
   } finally {
     $env:Path = $oldPath
     $env:FAKE_COMMAND_LOG = $oldLog

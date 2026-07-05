@@ -287,12 +287,12 @@ function Format-PathForDisplay {
 
   $display = $Path
   if ($env:USERPROFILE) {
-    $home = $env:USERPROFILE -replace '[\\/]+$', ''
+    $userProfileRoot = $env:USERPROFILE -replace '[\\/]+$', ''
     $comparison = [System.StringComparison]::OrdinalIgnoreCase
-    if ($display.Equals($home, $comparison)) {
+    if ($display.Equals($userProfileRoot, $comparison)) {
       $display = "~"
-    } elseif ($display.StartsWith("$home\", $comparison) -or $display.StartsWith("$home/", $comparison)) {
-      $display = "~$($display.Substring($home.Length))"
+    } elseif ($display.StartsWith("$userProfileRoot\", $comparison) -or $display.StartsWith("$userProfileRoot/", $comparison)) {
+      $display = "~$($display.Substring($userProfileRoot.Length))"
     }
   }
 
