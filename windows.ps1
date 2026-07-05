@@ -8,6 +8,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$PathDisplayWidth = 48
+$VersionDisplayMax = 80
 
 function Show-Help {
   @"
@@ -264,6 +266,48 @@ function Get-VersionLine {
   } catch {
     return "version check failed"
   }
+}
+
+function Format-VersionForDisplay {
+  param([string]$Version)
+
+  if ($Version.Length -le $VersionDisplayMax) {
+    return $Version
+  }
+
+  return "$($Version.Substring(0, $VersionDisplayMax - 3))..."
+}
+
+function Format-PathForDisplay {
+  param([string]$Path)
+
+  if (-not $Path) {
+    return ""
+  }
+
+  $display = $Path
+  if ($env:USERPROFILE) {
+    $home = $env:USERPROFILE -replace '[\\/]+$', ''
+    $comparison = [System.StringComparison]::OrdinalIgnoreCase
+    if ($display.Equals($home, $comparison)) {
+      $display = "~"
+    } elseif ($display.StartsWith("$home\", $comparison) -or $display.StartsWith("$home/", $comparison)) {
+      $display = "~$($display.Substring($home.Length))"
+    }
+  }
+
+  if ($display.Length -le $PathDisplayWidth) {
+    return $display
+  }
+
+  $headLength = 12
+  $tailLength = $PathDisplayWidth - $headLength - 3
+  $tail = $display.Substring($display.Length - $tailLength)
+  $separatorIndex = @($tail.IndexOf("\"), $tail.IndexOf("/")) | Where-Object { $_ -ge 0 } | Sort-Object | Select-Object -First 1
+  if ($null -ne $separatorIndex) {
+    $tail = $tail.Substring($separatorIndex)
+  }
+  return "$($display.Substring(0, $headLength))...$tail"
 }
 
 function Get-PackageVersionForSource {
@@ -620,7 +664,9 @@ foreach ($tool in $Tools) {
     $version = "version check failed"
   }
 
-  Write-Host ("[found]   {0,-14} {1,-46} {2,-24} {3}" -f $tool.Name, $cmd.Source, $source, $version)
+  $versionDisplay = Format-VersionForDisplay $version
+  $pathDisplay = Format-PathForDisplay $cmd.Source
+  Write-Host ("[found]   {0,-14} {1,-48} {2,-24} {3}" -f $tool.Name, $pathDisplay, $source, $versionDisplay)
 
   if ($UpgradeManaged) {
     if ($source -like "winget:*" -or $source -like "scoop:*" -or $source -like "choco:*") {

@@ -167,6 +167,20 @@ add_fake_empty_version_tool() {
     'esac'
 }
 
+add_fake_long_version_tool() {
+  local bin_dir="$1"
+  local command_name="$2"
+  write_executable "$bin_dir/$command_name" \
+    'case "$1" in' \
+    '  --version|-version)' \
+    '  printf "12345678901234567890123456789012345678901234567890123456789012345678901234567890hidden-tail\n"' \
+    '  ;;' \
+    '  *)' \
+    '  exit 2' \
+    '  ;;' \
+    'esac'
+}
+
 add_fake_verbose_ffmpeg_tool() {
   local bin_dir="$1"
   write_executable "$bin_dir/ffmpeg" \
@@ -488,6 +502,44 @@ test_linux_empty_successful_version_output_is_not_a_failure() {
   assert_not_contains "$output" "version check failed" "linux should not report successful empty version output as failed"
 }
 
+test_linux_caps_long_version_output() {
+  local dir bin output
+  dir="$(new_case_dir linux-long-version)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_long_version_tool "$bin" rg
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "[found]   ripgrep" "linux should find fake ripgrep"
+  assert_contains "$output" "12345678901234567890123456789012345678901234567890123456789012345678901234567..." "linux should shorten long version output with ellipsis"
+  assert_not_contains "$output" "hidden-tail" "linux should omit text beyond the version display cap"
+}
+
+test_linux_formats_display_paths() {
+  local dir bin output home node_dir long_dir path_value home_marker
+  dir="$(new_case_dir linux-display-paths)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  home="$dir/home"
+  node_dir="$home/.nvm/versions/node/v22.22.2/bin"
+  long_dir="$dir/path-segment-that-should-disappear/versions/node/v22.22.2/bin"
+  mkdir -p "$node_dir" "$long_dir"
+  add_common_shell_utilities "$bin"
+  add_fake_tool "$node_dir" node
+  add_fake_tool "$long_dir" rg
+  path_value="$long_dir:$node_dir:$bin"
+  home_marker="~"
+
+  HOME="$home" run_with_path "$output" "$path_value" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "$home_marker/.nvm/versions/node/v22.22.2/bin/node" "linux should display home paths with tilde"
+  assert_contains "$output" ".../versions/node/v22.22.2/bin/rg" "linux should preserve the useful tail when shortening long paths"
+  assert_not_contains "$output" "$home/.nvm" "linux should not print the full home directory in display paths"
+  assert_not_contains "$output" "path-segment-that-should-disappear" "linux should omit the middle of overlong display paths"
+}
+
 test_linux_finds_vendor_perl_exiftool() {
   local dir bin output
   dir="$(new_case_dir linux-vendor-perl-exiftool)"
@@ -505,7 +557,7 @@ test_linux_finds_vendor_perl_exiftool() {
   run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
 
   assert_contains "$output" "[found]   exiftool" "linux should find ExifTool in a vendor_perl PATH subdirectory"
-  assert_contains "$output" "$bin/vendor_perl/exiftool" "linux should report the vendor_perl ExifTool path"
+  assert_contains "$output" "/bin/vendor_perl/exiftool" "linux should report the vendor_perl ExifTool path suffix"
   assert_contains "$output" "13.59" "linux should run version checks for vendor_perl ExifTool"
   assert_contains "$output" "Version checks failed:  0" "linux should not fail vendor_perl ExifTool version checks"
 }
@@ -641,6 +693,44 @@ test_macos_empty_successful_version_output_is_not_a_failure() {
   assert_not_contains "$output" "version check failed" "macOS should not report successful empty version output as failed"
 }
 
+test_macos_caps_long_version_output() {
+  local dir bin output
+  dir="$(new_case_dir macos-long-version)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_long_version_tool "$bin" rg
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
+
+  assert_contains "$output" "[found]   ripgrep" "macOS should find fake ripgrep"
+  assert_contains "$output" "12345678901234567890123456789012345678901234567890123456789012345678901234567..." "macOS should shorten long version output with ellipsis"
+  assert_not_contains "$output" "hidden-tail" "macOS should omit text beyond the version display cap"
+}
+
+test_macos_formats_display_paths() {
+  local dir bin output home node_dir long_dir path_value home_marker
+  dir="$(new_case_dir macos-display-paths)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  home="$dir/home"
+  node_dir="$home/.nvm/versions/node/v22.22.2/bin"
+  long_dir="$dir/path-segment-that-should-disappear/versions/node/v22.22.2/bin"
+  mkdir -p "$node_dir" "$long_dir"
+  add_common_shell_utilities "$bin"
+  add_fake_tool "$node_dir" node
+  add_fake_tool "$long_dir" rg
+  path_value="$long_dir:$node_dir:$bin"
+  home_marker="~"
+
+  HOME="$home" run_with_path "$output" "$path_value" /bin/bash "$ROOT_DIR/macos.sh"
+
+  assert_contains "$output" "$home_marker/.nvm/versions/node/v22.22.2/bin/node" "macOS should display home paths with tilde"
+  assert_contains "$output" ".../versions/node/v22.22.2/bin/rg" "macOS should preserve the useful tail when shortening long paths"
+  assert_not_contains "$output" "$home/.nvm" "macOS should not print the full home directory in display paths"
+  assert_not_contains "$output" "path-segment-that-should-disappear" "macOS should omit the middle of overlong display paths"
+}
+
 test_macos_upgrade_managed_uses_homebrew_owner() {
   local dir bin log output prefix rg_dir path_value
   dir="$(new_case_dir macos-upgrade-managed)"
@@ -676,6 +766,8 @@ run_test "linux install-missing uses selected managers" test_linux_install_missi
 run_test "linux zypper rebuilds metadata after install failure" test_linux_zypper_rebuilds_metadata_after_install_failure
 run_test "linux GitHub release downloads use token" test_linux_github_release_downloads_use_token_when_available
 run_test "linux empty successful version output is not a failure" test_linux_empty_successful_version_output_is_not_a_failure
+run_test "linux caps long version output" test_linux_caps_long_version_output
+run_test "linux formats display paths" test_linux_formats_display_paths
 run_test "linux finds vendor_perl ExifTool" test_linux_finds_vendor_perl_exiftool
 run_test "linux verbose FFmpeg version output is not a pipefail failure" test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure
 run_test "linux upgrade-managed uses managed owner only" test_linux_upgrade_managed_uses_owner_only
@@ -684,4 +776,6 @@ run_test "macOS check-only does not install" test_macos_check_only_does_not_inst
 run_test "macOS install-missing uses Homebrew" test_macos_install_missing_uses_brew
 run_test "macOS install-missing without Homebrew prints guidance" test_macos_install_without_brew_prints_guidance
 run_test "macOS empty successful version output is not a failure" test_macos_empty_successful_version_output_is_not_a_failure
+run_test "macOS caps long version output" test_macos_caps_long_version_output
+run_test "macOS formats display paths" test_macos_formats_display_paths
 run_test "macOS upgrade-managed uses Homebrew owner" test_macos_upgrade_managed_uses_homebrew_owner

@@ -4,6 +4,8 @@ set -euo pipefail
 INSTALL_MISSING=0
 UPGRADE_MANAGED=0
 PREFERRED_MANAGER="auto"
+PATH_DISPLAY_WIDTH=48
+VERSION_DISPLAY_MAX=80
 
 usage() {
   cat <<'MSG'
@@ -197,6 +199,44 @@ version_for() {
       first_output_line "$command_name" --version
       ;;
   esac
+}
+
+version_for_display() {
+  local version="$1"
+  if [ "${#version}" -le "$VERSION_DISPLAY_MAX" ]; then
+    printf '%s' "$version"
+    return 0
+  fi
+
+  printf '%s...' "${version:0:$((VERSION_DISPLAY_MAX - 3))}"
+}
+
+path_for_display() {
+  local path="$1"
+  local display="$path"
+  local head_width=12
+  local tail_width=$((PATH_DISPLAY_WIDTH - head_width - 3))
+  local home_marker="~"
+  local tail
+
+  if [ -n "${HOME:-}" ]; then
+    if [ "$display" = "$HOME" ]; then
+      display="$home_marker"
+    elif [ "${display#"$HOME"/}" != "$display" ]; then
+      display="$home_marker/${display#"$HOME"/}"
+    fi
+  fi
+
+  if [ "${#display}" -le "$PATH_DISPLAY_WIDTH" ]; then
+    printf '%s' "$display"
+    return 0
+  fi
+
+  tail="${display: -$tail_width}"
+  if [ "${tail#*/}" != "$tail" ]; then
+    tail="/${tail#*/}"
+  fi
+  printf '%s...%s' "${display:0:$head_width}" "$tail"
 }
 
 detect_source() {
@@ -691,7 +731,9 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
     version="version check failed"
   fi
 
-  printf '[found]   %-14s %-36s %-22s %s\n' "$name" "$command_path" "$source" "$version"
+  version_display="$(version_for_display "$version")"
+  path_display="$(path_for_display "$command_path")"
+  printf '[found]   %-14s %-48s %-22s %s\n' "$name" "$path_display" "$source" "$version_display"
 
   case "$source" in
     apt:*|rpm:*|pacman:*)

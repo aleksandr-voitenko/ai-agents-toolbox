@@ -117,6 +117,19 @@ function Add-FakeEmptyVersionTool {
   )
 }
 
+function Add-FakeLongVersionTool {
+  param(
+    [string]$Directory,
+    [string]$CommandName
+  )
+
+  Write-CmdFile -Path (Join-Path $Directory "$CommandName.cmd") -Lines @(
+    'if /I not "%1"=="--version" exit /b 2',
+    "echo 12345678901234567890123456789012345678901234567890123456789012345678901234567890hidden-tail",
+    "exit /b 0"
+  )
+}
+
 function Add-FakeMultiLineVersionTool {
   param(
     [string]$Directory,
@@ -399,6 +412,32 @@ try {
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail successful empty version checks"
     Assert-NotContains $output "version output empty" "Windows should prefer package metadata when it is available"
     Assert-NotContains $output "version check failed" "Windows should not report successful empty version output as failed"
+  }
+
+  Run-Test "Windows caps long version output" {
+    $ctx = New-TestContext "long-version"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeLongVersionTool $ctx.Bin "rg"
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
+    Assert-Contains $output "12345678901234567890123456789012345678901234567890123456789012345678901234567..." "Windows should shorten long version output with ellipsis"
+    Assert-NotContains $output "hidden-tail" "Windows should omit text beyond the version display cap"
+  }
+
+  Run-Test "Windows formats display paths" {
+    $ctx = New-TestContext "display-paths"
+    $longDir = Join-Path $ctx.Root "path-segment-that-should-disappear\versions\v1\bin"
+    New-Item -ItemType Directory -Force -Path $longDir | Out-Null
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeTool $longDir "rg"
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true } @($longDir)
+
+    Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
+    Assert-Contains $output "...\versions\v1\bin\rg.cmd" "Windows should preserve the useful tail when shortening long paths"
+    Assert-NotContains $output "path-segment-that-should-disappear" "Windows should omit the middle of overlong display paths"
   }
 
   Run-Test "Windows multiline version output uses first line without failing" {
