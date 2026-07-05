@@ -109,11 +109,32 @@ curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbo
 
 Use PowerShell.
 
-Optionally get a report about missing and available tools:
+Optionally get a report about missing and available package managers and tools:
 
 ```powershell
 irm https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/windows.ps1 | iex
 ```
+
+You might need to install package manager(s) in order to make all the tools obtainable.
+
+**WinGet:**
+
+```powershell
+start ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1
+```
+
+That opens Microsoft Store to App Installer, which contains `winget.exe`.
+
+**Scoop:**
+
+Run the following commands from a regular (non-admin) PowerShell terminal to install Scoop:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+```
+
+It is recommended to rerun the report generation after installing package managers.
 
 Automatically install missing tools:
 
