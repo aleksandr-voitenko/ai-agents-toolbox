@@ -305,7 +305,12 @@ function Format-PathForDisplay {
   $tail = $display.Substring($display.Length - $tailLength)
   $separatorIndex = @($tail.IndexOf("\"), $tail.IndexOf("/")) | Where-Object { $_ -ge 0 } | Sort-Object | Select-Object -First 1
   if ($null -ne $separatorIndex) {
-    $tail = $tail.Substring($separatorIndex)
+    $boundaryTail = $tail.Substring($separatorIndex)
+    # Prefer a path-segment boundary unless it would leave most of the
+    # fixed-width path column empty for a long final directory segment.
+    if ($boundaryTail.Length -ge [Math]::Ceiling($tailLength / 2)) {
+      $tail = $boundaryTail
+    }
   }
   return "$($display.Substring(0, $headLength))...$tail"
 }
