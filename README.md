@@ -58,6 +58,17 @@ The scripts manage these logical tools across supported platforms:
 | `hyperfine` | Command-line benchmarking tool. |
 | `shellcheck` | Static analyzer for shell scripts. |
 | `shfmt` | Formatter for shell scripts. |
+| `tar` | Tape archive utility for creating and extracting `.tar` archives. |
+| `zip` | ZIP archive creation utility. |
+| `unzip` | ZIP archive extraction utility. |
+| `rsync` | Incremental file synchronization and copy utility. |
+| `xxd` | Hex dump and reverse-hex-dump utility. |
+| `hexdump` | Traditional byte-oriented hex dump utility. |
+| `stat` | Filesystem metadata inspection utility. |
+| `realpath` | Canonical path resolution utility. |
+| `uv` | Fast Python package, project, and tool manager. |
+| `pre-commit` | Framework for managing and running repository pre-commit hooks. |
+| `ast-grep` | AST-aware code search, linting, and rewrite tool. |
 | `ghostscript` (`gs`) | PostScript and PDF interpreter used by document workflows. |
 | `pdftotext` | PDF text extraction tool from Poppler. |
 
@@ -65,7 +76,18 @@ Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
 the `git-delta` package, `difft` by `difftastic`, and `typos` by Homebrew's
 `typos-cli` formula. Some Linux distributions also package `pandoc`, `ffmpeg`,
-ImageMagick, and ExifTool under distribution-specific names or paths.
+ImageMagick, ExifTool, `xxd`, `hexdump`, `stat`, and `realpath` under
+distribution-specific names or paths.
+
+Some requested tools are supplied by default operating-system utilities on many
+machines. For example, macOS normally provides `tar`, `zip`, `unzip`, `rsync`,
+`xxd`, `hexdump`, `stat`, and `realpath`; Homebrew fallback packages may expose
+GNU-prefixed command names such as `gtar`, `gstat`, and `grealpath`. Linux
+fallbacks install upstream `uv` and `ast-grep` release assets only where default
+distribution repositories do not provide native packages. On Windows,
+`pre-commit` and `hexdump` are detected when already available on `PATH`, but
+they currently have no verified package mapping through winget, Scoop, or
+Chocolatey.
 
 ## One-Line Installers
 
@@ -274,9 +296,11 @@ and Windows. They also run hermetic fake-manager tests that verify install and
 upgrade behavior without touching real package managers.
 
 The install smoke workflow also runs the opt-in install path on disposable
-Linux distro containers, macOS with Homebrew, and Windows with Chocolatey. It
-is enabled for pull requests, pushes, and its nightly schedule while live
-package-manager failures are being debugged.
+Linux distro containers, macOS with Homebrew, and Windows with Chocolatey. The
+Windows Chocolatey smoke permits only the known unsupported Windows mappings
+(`pre-commit`, `ast-grep`, and `hexdump`) to remain missing. It is enabled for
+pull requests, pushes, and its nightly schedule while live package-manager
+failures are being debugged.
 
 Run the hermetic tests locally with:
 

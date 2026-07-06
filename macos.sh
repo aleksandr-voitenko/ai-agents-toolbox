@@ -79,6 +79,17 @@ exiftool|exiftool|exiftool
 hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck
 shfmt|shfmt|shfmt
+tar|tar,gtar|gnu-tar
+zip|zip|zip
+unzip|unzip|unzip
+rsync|rsync|rsync
+xxd|xxd|vim
+hexdump|hexdump|util-linux
+stat|stat,gstat|coreutils
+realpath|realpath,grealpath|coreutils
+uv|uv|uv
+pre-commit|pre-commit|pre-commit
+ast-grep|ast-grep|ast-grep
 ghostscript|gs|ghostscript
 pdftotext|pdftotext|poppler
 EOF
@@ -124,11 +135,17 @@ version_for() {
     pdftotext)
       version_output "$command_name" -v
       ;;
+    zip|unzip)
+      version_output "$command_name" -v
+      ;;
     ffmpeg)
       version_output "$command_name" -version
       ;;
     exiftool)
       version_output "$command_name" -ver
+      ;;
+    hexdump|stat|realpath)
+      version_output "$command_name" --version || printf '%s\n' "system utility; no version flag"
       ;;
     *)
       version_output "$command_name" --version

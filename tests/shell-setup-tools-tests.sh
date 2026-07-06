@@ -136,6 +136,7 @@ add_common_shell_utilities() {
   link_utility "$bin_dir" uname
   link_utility "$bin_dir" env
   link_utility "$bin_dir" mktemp
+  link_utility "$bin_dir" mkdir
   link_utility "$bin_dir" rm
 
   write_executable "$bin_dir/id" \
@@ -307,16 +308,64 @@ add_fake_github_release_installers() {
     '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
     '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
     '    ;;' \
+    '  *api.github.com/repos/astral-sh/uv/releases/latest*)' \
+    '    printf "%s\n" "{\"name\":\"uv-x86_64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/astral-sh/uv/releases/download/0.11.26/uv-x86_64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"name\":\"uv-x86_64-unknown-linux-gnu.tar.gz.sha256\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/astral-sh/uv/releases/download/0.11.26/uv-x86_64-unknown-linux-gnu.tar.gz.sha256\"}"' \
+    '    printf "%s\n" "{\"name\":\"uv-aarch64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/astral-sh/uv/releases/download/0.11.26/uv-aarch64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"name\":\"uv-aarch64-unknown-linux-gnu.tar.gz.sha256\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/astral-sh/uv/releases/download/0.11.26/uv-aarch64-unknown-linux-gnu.tar.gz.sha256\"}"' \
+    '    printf "%s\n" "{\"name\":\"uv-i686-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/astral-sh/uv/releases/download/0.11.26/uv-i686-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"name\":\"uv-i686-unknown-linux-gnu.tar.gz.sha256\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/astral-sh/uv/releases/download/0.11.26/uv-i686-unknown-linux-gnu.tar.gz.sha256\"}"' \
+    '    ;;' \
+    '  *api.github.com/repos/ast-grep/ast-grep/releases/latest*)' \
+    '    printf "%s\n" "{\"name\":\"app-x86_64-unknown-linux-gnu.zip\"}"' \
+    '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/ast-grep/ast-grep/releases/download/0.44.1/app-x86_64-unknown-linux-gnu.zip\"}"' \
+    '    printf "%s\n" "{\"name\":\"app-aarch64-unknown-linux-gnu.zip\"}"' \
+    '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/ast-grep/ast-grep/releases/download/0.44.1/app-aarch64-unknown-linux-gnu.zip\"}"' \
+    '    ;;' \
+    '  *uv-*-unknown-linux-gnu.tar.gz.sha256*)' \
+    '    asset="${url##*/}"' \
+    '    printf "fake  %s\n" "${asset%.sha256}"' \
+    '    ;;' \
     '  *)' \
     '    printf "fake actionlint archive\n"' \
     '    ;;' \
     'esac'
 
   write_executable "$bin_dir/tar" \
+    'if [ "$1" = "--version" ]; then' \
+    '  printf "tar 1.0\n"' \
+    '  exit 0' \
+    'fi' \
     'printf "tar %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    'mkdir -p uv-x86_64-unknown-linux-gnu' \
+    'mkdir -p uv-aarch64-unknown-linux-gnu' \
+    'mkdir -p uv-i686-unknown-linux-gnu' \
     ': > actionlint' \
     ': > typos' \
-    ': > difft'
+    ': > difft' \
+    ': > uv-x86_64-unknown-linux-gnu/uv' \
+    ': > uv-x86_64-unknown-linux-gnu/uvx' \
+    ': > uv-aarch64-unknown-linux-gnu/uv' \
+    ': > uv-aarch64-unknown-linux-gnu/uvx' \
+    ': > uv-i686-unknown-linux-gnu/uv' \
+    ': > uv-i686-unknown-linux-gnu/uvx'
+
+  write_executable "$bin_dir/unzip" \
+    'if [ "$1" = "-v" ]; then' \
+    '  printf "UnZip 6.00\n"' \
+    '  exit 0' \
+    'fi' \
+    'printf "unzip %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    ': > ast-grep' \
+    ': > sg'
 
   write_executable "$bin_dir/install" \
     'printf "install %s\n" "$*" >> "$FAKE_COMMAND_LOG"'
@@ -385,6 +434,7 @@ test_linux_check_only_does_not_install() {
 test_linux_install_missing_uses_selected_managers() {
   local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos
   local expected_just expected_difftastic expected_pandoc expected_imagemagick expected_ffmpeg expected_exiftool last_expected
+  local expected_uv expected_pre_commit expected_ast_grep expected_zip expected_rsync expected_xxd expected_hexdump expected_stat uv_release_dir
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -396,6 +446,21 @@ test_linux_install_missing_uses_selected_managers() {
     add_fake_github_release_installers "$bin"
 
     FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --manager "$manager" --install-missing
+
+    case "$(uname -m)" in
+      x86_64|amd64)
+        uv_release_dir="uv-x86_64-unknown-linux-gnu"
+        ;;
+      aarch64|arm64)
+        uv_release_dir="uv-aarch64-unknown-linux-gnu"
+        ;;
+      i386|i686)
+        uv_release_dir="uv-i686-unknown-linux-gnu"
+        ;;
+      *)
+        fail "unsupported test architecture for uv release fixture: $(uname -m)"
+        ;;
+    esac
 
     case "$manager" in
       apt)
@@ -411,6 +476,14 @@ test_linux_install_missing_uses_selected_managers() {
         expected_imagemagick="apt-get install -y imagemagick"
         expected_ffmpeg="apt-get install -y ffmpeg"
         expected_exiftool="apt-get install -y libimage-exiftool-perl"
+        expected_uv="install -m 0755 $uv_release_dir/uv /usr/local/bin/uv"
+        expected_pre_commit="apt-get install -y pre-commit"
+        expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
+        expected_zip="apt-get install -y zip"
+        expected_rsync="apt-get install -y rsync"
+        expected_xxd="apt-get install -y xxd"
+        expected_hexdump="apt-get install -y bsdextrautils"
+        expected_stat="apt-get install -y coreutils"
         last_expected="apt-get install -y poppler-utils"
         ;;
       dnf)
@@ -426,6 +499,14 @@ test_linux_install_missing_uses_selected_managers() {
         expected_imagemagick="dnf install -y ImageMagick"
         expected_ffmpeg="dnf install -y ffmpeg-free"
         expected_exiftool="dnf install -y perl-Image-ExifTool"
+        expected_uv="dnf install -y uv"
+        expected_pre_commit="dnf install -y pre-commit"
+        expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
+        expected_zip="dnf install -y zip"
+        expected_rsync="dnf install -y rsync"
+        expected_xxd="dnf install -y xxd"
+        expected_hexdump="dnf install -y util-linux"
+        expected_stat="dnf install -y coreutils"
         last_expected="dnf install -y poppler-utils"
         ;;
       pacman)
@@ -441,6 +522,14 @@ test_linux_install_missing_uses_selected_managers() {
         expected_imagemagick="pacman -S --needed --noconfirm imagemagick"
         expected_ffmpeg="pacman -S --needed --noconfirm ffmpeg"
         expected_exiftool="pacman -S --needed --noconfirm perl-image-exiftool"
+        expected_uv="pacman -S --needed --noconfirm uv"
+        expected_pre_commit="pacman -S --needed --noconfirm pre-commit"
+        expected_ast_grep="pacman -S --needed --noconfirm ast-grep"
+        expected_zip="pacman -S --needed --noconfirm zip"
+        expected_rsync="pacman -S --needed --noconfirm rsync"
+        expected_xxd="pacman -S --needed --noconfirm vim"
+        expected_hexdump="pacman -S --needed --noconfirm util-linux"
+        expected_stat="pacman -S --needed --noconfirm coreutils"
         last_expected="pacman -S --needed --noconfirm poppler"
         ;;
       zypper)
@@ -456,6 +545,14 @@ test_linux_install_missing_uses_selected_managers() {
         expected_imagemagick="zypper install -y ImageMagick"
         expected_ffmpeg="zypper install -y ffmpeg-8"
         expected_exiftool="zypper install -y exiftool"
+        expected_uv="install -m 0755 $uv_release_dir/uv /usr/local/bin/uv"
+        expected_pre_commit="zypper install -y pre-commit"
+        expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
+        expected_zip="zypper install -y zip"
+        expected_rsync="zypper install -y rsync"
+        expected_xxd="zypper install -y vim"
+        expected_hexdump="zypper install -y util-linux"
+        expected_stat="zypper install -y coreutils"
         last_expected="zypper install -y poppler-tools"
         ;;
     esac
@@ -471,6 +568,14 @@ test_linux_install_missing_uses_selected_managers() {
     assert_log_contains "$log" "$expected_imagemagick" "linux install should map ImageMagick for $manager"
     assert_log_contains "$log" "$expected_ffmpeg" "linux install should map ffmpeg for $manager"
     assert_log_contains "$log" "$expected_exiftool" "linux install should map exiftool for $manager"
+    assert_log_contains "$log" "$expected_uv" "linux install should map uv for $manager"
+    assert_log_contains "$log" "$expected_pre_commit" "linux install should map pre-commit for $manager"
+    assert_log_contains "$log" "$expected_ast_grep" "linux install should map ast-grep for $manager"
+    assert_log_contains "$log" "$expected_zip" "linux install should map zip for $manager"
+    assert_log_contains "$log" "$expected_rsync" "linux install should map rsync for $manager"
+    assert_log_contains "$log" "$expected_xxd" "linux install should map xxd for $manager"
+    assert_log_contains "$log" "$expected_hexdump" "linux install should map hexdump for $manager"
+    assert_log_contains "$log" "$expected_stat" "linux install should map stat/realpath for $manager"
     assert_log_contains "$log" "$last_expected" "linux install should keep processing tools after $manager invokes a package command"
     if [ "$manager" = "apt" ]; then
       assert_log_contains "$log" "DEBIAN_FRONTEND=noninteractive" "apt installs should run noninteractively"
@@ -703,6 +808,16 @@ test_macos_install_missing_uses_brew() {
   assert_log_contains "$log" "brew install imagemagick" "macOS install should map ImageMagick to Homebrew"
   assert_log_contains "$log" "brew install ffmpeg" "macOS install should map ffmpeg to Homebrew"
   assert_log_contains "$log" "brew install exiftool" "macOS install should map exiftool to Homebrew"
+  assert_log_contains "$log" "brew install gnu-tar" "macOS install should map tar to GNU tar"
+  assert_log_contains "$log" "brew install zip" "macOS install should map zip to Homebrew"
+  assert_log_contains "$log" "brew install unzip" "macOS install should map unzip to Homebrew"
+  assert_log_contains "$log" "brew install rsync" "macOS install should map rsync to Homebrew"
+  assert_log_contains "$log" "brew install vim" "macOS install should map xxd to Vim"
+  assert_log_contains "$log" "brew install util-linux" "macOS install should map hexdump to util-linux"
+  assert_log_contains "$log" "brew install coreutils" "macOS install should map stat and realpath to coreutils"
+  assert_log_contains "$log" "brew install uv" "macOS install should map uv to Homebrew"
+  assert_log_contains "$log" "brew install pre-commit" "macOS install should map pre-commit to Homebrew"
+  assert_log_contains "$log" "brew install ast-grep" "macOS install should map ast-grep to Homebrew"
 }
 
 test_macos_install_without_brew_prints_guidance() {

@@ -90,6 +90,17 @@ exiftool|exiftool,vendor_perl/exiftool|libimage-exiftool-perl|perl-Image-ExifToo
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck
 shfmt|shfmt|shfmt|shfmt|shfmt|shfmt
+tar|tar|tar|tar|tar|tar
+zip|zip|zip|zip|zip|zip
+unzip|unzip|unzip|unzip|unzip|unzip
+rsync|rsync|rsync|rsync|rsync|rsync
+xxd|xxd|xxd|xxd|vim|vim
+hexdump|hexdump|bsdextrautils|util-linux|util-linux|util-linux
+stat|stat|coreutils|coreutils|coreutils|coreutils
+realpath|realpath|coreutils|coreutils|coreutils|coreutils
+uv|uv|github-release:uv|uv|uv|github-release:uv
+pre-commit|pre-commit|pre-commit|pre-commit|pre-commit|pre-commit
+ast-grep|ast-grep|github-release:ast-grep|github-release:ast-grep|ast-grep|github-release:ast-grep
 ghostscript|gs|ghostscript|ghostscript|ghostscript|ghostscript
 pdftotext|pdftotext|poppler-utils|poppler-utils|poppler|poppler-tools
 EOF
@@ -210,6 +221,9 @@ version_for() {
     pdftotext)
       version_output "$command_name" -v
       ;;
+    zip|unzip)
+      version_output "$command_name" -v
+      ;;
     shfmt)
       version_output "$command_name" -version
       ;;
@@ -218,6 +232,9 @@ version_for() {
       ;;
     exiftool)
       version_output "$command_name" -ver
+      ;;
+    hexdump|stat|realpath)
+      version_output "$command_name" --version || printf '%s\n' "system utility; no version flag"
       ;;
     *)
       version_output "$command_name" --version
@@ -622,6 +639,133 @@ install_difftastic_release() {
   return "$status"
 }
 
+uv_release_target() {
+  case "$(uname -m)" in
+    x86_64|amd64)
+      printf 'x86_64-unknown-linux-gnu'
+      ;;
+    aarch64|arm64)
+      printf 'aarch64-unknown-linux-gnu'
+      ;;
+    i386|i686)
+      printf 'i686-unknown-linux-gnu'
+      ;;
+    *)
+      echo "Unsupported uv release architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+install_uv_release() {
+  local target api_url asset_name asset_url checksum_url tmp_dir status
+
+  target="$(uv_release_target)"
+  api_url="https://api.github.com/repos/astral-sh/uv/releases/latest"
+  asset_name="uv-${target}.tar.gz"
+  tmp_dir="$(mktemp -d)"
+  status=0
+
+  (
+    set -e
+    cd "$tmp_dir"
+    download_to_stdout "$api_url" > release.json
+    asset_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_url" ]; then
+      echo "Could not find a uv Linux $target release asset." >&2
+      exit 1
+    fi
+
+    checksum_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\.sha256\\)\".*#\\1#p" release.json | head -n 1)"
+    download_to_stdout "$asset_url" > "$asset_name"
+
+    if have sha256sum; then
+      if [ -z "$checksum_url" ]; then
+        echo "Could not find a uv SHA256 checksum for $asset_name." >&2
+        exit 1
+      fi
+      download_to_stdout "$checksum_url" > "$asset_name.sha256"
+      sha256sum -c "$asset_name.sha256"
+    else
+      echo "sha256sum was not found; skipping uv checksum verification." >&2
+    fi
+
+    tar -xzf "$asset_name"
+    if [ ! -f "uv-${target}/uv" ]; then
+      echo "Could not find uv in $asset_name." >&2
+      exit 1
+    fi
+    run_elevated install -m 0755 "uv-${target}/uv" /usr/local/bin/uv
+    if [ -f "uv-${target}/uvx" ]; then
+      run_elevated install -m 0755 "uv-${target}/uvx" /usr/local/bin/uvx
+    fi
+  ) || status=$?
+
+  rm -rf "$tmp_dir"
+  return "$status"
+}
+
+ast_grep_release_target() {
+  case "$(uname -m)" in
+    x86_64|amd64)
+      printf 'x86_64-unknown-linux-gnu'
+      ;;
+    aarch64|arm64)
+      printf 'aarch64-unknown-linux-gnu'
+      ;;
+    *)
+      echo "Unsupported ast-grep release architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+install_ast_grep_release() {
+  local target api_url asset_name asset_url asset_digest tmp_dir status
+
+  target="$(ast_grep_release_target)"
+  api_url="https://api.github.com/repos/ast-grep/ast-grep/releases/latest"
+  asset_name="app-${target}.zip"
+  tmp_dir="$(mktemp -d)"
+  status=0
+
+  (
+    set -e
+    cd "$tmp_dir"
+    download_to_stdout "$api_url" > release.json
+    asset_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_url" ]; then
+      echo "Could not find an ast-grep Linux $target release asset." >&2
+      exit 1
+    fi
+
+    asset_digest="$(sed -n "/\"name\":[[:space:]]*\"$asset_name\"/,/\"browser_download_url\"/s#.*\"digest\":[[:space:]]*\"sha256:\\([a-f0-9]*\\)\".*#\\1#p" release.json | head -n 1)"
+    download_to_stdout "$asset_url" > "$asset_name"
+
+    if have sha256sum; then
+      if [ -z "$asset_digest" ]; then
+        echo "Could not find a GitHub SHA256 digest for $asset_name." >&2
+        exit 1
+      fi
+      printf '%s  %s\n' "$asset_digest" "$asset_name" | sha256sum -c -
+    else
+      echo "sha256sum was not found; skipping ast-grep checksum verification." >&2
+    fi
+
+    unzip -q "$asset_name"
+    if [ ! -f ast-grep ]; then
+      echo "Could not find ast-grep in $asset_name." >&2
+      exit 1
+    fi
+    # Do not install the release's `sg` alias: Linux systems commonly already
+    # have an unrelated `sg` command, and /usr/local/bin may shadow it.
+    run_elevated install -m 0755 ast-grep /usr/local/bin/ast-grep
+  ) || status=$?
+
+  rm -rf "$tmp_dir"
+  return "$status"
+}
+
 install_github_release_tool() {
   local package="$1"
   case "$package" in
@@ -633,6 +777,12 @@ install_github_release_tool() {
       ;;
     github-release:difftastic)
       install_difftastic_release
+      ;;
+    github-release:uv)
+      install_uv_release
+      ;;
+    github-release:ast-grep)
+      install_ast_grep_release
       ;;
     *)
       echo "Unsupported GitHub release installer: $package" >&2

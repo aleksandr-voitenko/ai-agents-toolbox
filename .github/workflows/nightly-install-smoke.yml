@@ -74,8 +74,13 @@ jobs:
           $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
           & $powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -InstallMissing -Manager choco
           & $powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -CheckOnly | Tee-Object -FilePath "$env:TEMP\setup-tools-url-check.log"
-          Select-String -Path "$env:TEMP\setup-tools-url-check.log" -SimpleMatch "Missing before install: 0"
           Select-String -Path "$env:TEMP\setup-tools-url-check.log" -SimpleMatch "Version checks failed:  0"
+          $expectedMissing = @("pre-commit", "ast-grep", "hexdump")
+          $missing = Select-String -Path "$env:TEMP\setup-tools-url-check.log" -Pattern '^\[missing\]\s+(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $unexpectedMissing = @($missing | Where-Object { $expectedMissing -notcontains $_ })
+          if ($unexpectedMissing.Count -gt 0) {
+            throw "Unexpected missing Windows tool(s) after Chocolatey install: $($unexpectedMissing -join ', ')"
+          }
 
   linux-install-smoke:
     name: Linux install smoke (${{ matrix.manager }})
@@ -163,5 +168,10 @@ jobs:
           $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
           & $powershell -NoProfile -ExecutionPolicy Bypass -File .\windows.ps1 -InstallMissing -Manager choco
           & $powershell -NoProfile -ExecutionPolicy Bypass -File .\windows.ps1 -CheckOnly | Tee-Object -FilePath "$env:TEMP\setup-tools-check.log"
-          Select-String -Path "$env:TEMP\setup-tools-check.log" -SimpleMatch "Missing before install: 0"
           Select-String -Path "$env:TEMP\setup-tools-check.log" -SimpleMatch "Version checks failed:  0"
+          $expectedMissing = @("pre-commit", "ast-grep", "hexdump")
+          $missing = Select-String -Path "$env:TEMP\setup-tools-check.log" -Pattern '^\[missing\]\s+(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $unexpectedMissing = @($missing | Where-Object { $expectedMissing -notcontains $_ })
+          if ($unexpectedMissing.Count -gt 0) {
+            throw "Unexpected missing Windows tool(s) after Chocolatey install: $($unexpectedMissing -join ', ')"
+          }

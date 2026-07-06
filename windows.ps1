@@ -65,6 +65,17 @@ $Tools = @(
   @{ Name = "hyperfine"; Commands = @("hyperfine.exe", "hyperfine"); Winget = "sharkdp.hyperfine"; Scoop = "hyperfine"; Choco = "hyperfine" },
   @{ Name = "shellcheck"; Commands = @("shellcheck.exe", "shellcheck"); Winget = "koalaman.shellcheck"; Scoop = "shellcheck"; Choco = "shellcheck" },
   @{ Name = "shfmt"; Commands = @("shfmt.exe", "shfmt"); Winget = "mvdan.shfmt"; Scoop = "shfmt"; Choco = "shfmt" },
+  @{ Name = "tar"; Commands = @("tar.exe", "tar"); Winget = $null; Scoop = $null; Choco = $null },
+  @{ Name = "zip"; Commands = @("zip.exe", "zip"); Winget = $null; Scoop = "zip"; Choco = "zip" },
+  @{ Name = "unzip"; Commands = @("unzip.exe", "unzip"); Winget = $null; Scoop = "unzip"; Choco = "unzip" },
+  @{ Name = "rsync"; Commands = @("rsync.exe", "rsync"); Winget = $null; Scoop = $null; Choco = "rsync" },
+  @{ Name = "xxd"; Commands = @("xxd.exe", "xxd"); Winget = $null; Scoop = "vim"; Choco = "xxd" },
+  @{ Name = "hexdump"; Commands = @("hexdump.exe", "hexdump"); Winget = $null; Scoop = $null; Choco = $null },
+  @{ Name = "stat"; Commands = @("stat.exe", "stat"); Winget = "Microsoft.Coreutils"; Scoop = "coreutils"; Choco = "mscoreutils" },
+  @{ Name = "realpath"; Commands = @("realpath.exe", "realpath"); Winget = "Microsoft.Coreutils"; Scoop = "coreutils"; Choco = "mscoreutils" },
+  @{ Name = "uv"; Commands = @("uv.exe", "uv"); Winget = "astral-sh.uv"; Scoop = "uv"; Choco = "uv" },
+  @{ Name = "pre-commit"; Commands = @("pre-commit.exe", "pre-commit"); Winget = $null; Scoop = $null; Choco = $null },
+  @{ Name = "ast-grep"; Commands = @("ast-grep.exe", "ast-grep"); Winget = "ast-grep.ast-grep"; Scoop = "ast-grep"; Choco = $null },
   @{ Name = "ghostscript"; Commands = @("gswin64c.exe", "gswin32c.exe", "gs.exe", "gs"); Winget = $null; Scoop = "ghostscript"; Choco = "ghostscript" },
   @{ Name = "pdftotext"; Commands = @("pdftotext.exe", "pdftotext"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler" }
 )
@@ -220,6 +231,9 @@ function Get-VersionArguments {
   if ($baseName -eq "pdftotext") {
     return @("-v")
   }
+  if ($baseName -eq "zip" -or $baseName -eq "unzip") {
+    return @("-v")
+  }
   if ($baseName -eq "ffmpeg") {
     return @("-version")
   }
@@ -291,7 +305,13 @@ function Get-VersionLine {
     } finally {
       $ErrorActionPreference = $previousErrorActionPreference
     }
-    if ($exitCode -ne 0) { return "version check failed" }
+    if ($exitCode -ne 0) {
+      $baseName = [System.IO.Path]::GetFileNameWithoutExtension($commandName)
+      if ($baseName -eq "hexdump" -or $baseName -eq "stat" -or $baseName -eq "realpath") {
+        return "system utility; no version flag"
+      }
+      return "version check failed"
+    }
 
     return Get-VersionFromOutput $output
   } catch {

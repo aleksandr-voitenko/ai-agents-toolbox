@@ -39,16 +39,21 @@ This conservative stance is the main project invariant.
 - Do not silently switch package managers for an already-installed command.
 - Keep direct upstream binary installs rare and explicit. The current Linux
   exceptions are missing `actionlint` and `typos` when apt, dnf, or zypper has
-  no verified native package, plus missing `difftastic` on apt where Ubuntu's
-  default repositories have no native package. The script downloads the
+  no verified native package, missing `difftastic` on apt where Ubuntu's
+  default repositories have no native package, missing `uv` on apt or zypper,
+  and missing `ast-grep` on apt, dnf, or zypper. The script downloads the
   official GitHub release, verifies a checksum or release-asset digest when
   `sha256sum` is available, and installs it to `/usr/local/bin` without taking
   over future managed upgrades. GitHub API requests should use `GITHUB_TOKEN`
   when it is available, especially inside CI install-smoke containers, while
   still working anonymously for normal users when rate limits allow it.
 - Treat source detection as best effort and label uncertain cases honestly.
-- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `difftastic` -> `difft`, `typos-cli` -> `typos`, `libmagic` -> `file`, `ImageMagick`/`imagemagick` -> `magick` or `convert`, `libimage-exiftool-perl`/`perl-Image-ExifTool`/`perl-image-exiftool`/`exiftool` -> `exiftool` or `vendor_perl/exiftool`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
+- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `difftastic` -> `difft`, `typos-cli` -> `typos`, `libmagic` -> `file`, `ImageMagick`/`imagemagick` -> `magick` or `convert`, `libimage-exiftool-perl`/`perl-Image-ExifTool`/`perl-image-exiftool`/`exiftool` -> `exiftool` or `vendor_perl/exiftool`, `vim` -> `xxd`, `bsdextrautils`/`util-linux` -> `hexdump`, `coreutils`/`mscoreutils` -> `stat` and `realpath`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
 - Be careful with Windows: PATH shims and multi-manager ownership can be messy. Prefer reporting uncertainty over making destructive assumptions.
+- Keep Windows package mappings blank when a supported manager does not expose
+  the requested command reliably. `pre-commit` and `hexdump` are currently
+  detection-only on Windows, and `ast-grep` has winget/Scoop mappings but no
+  verified Chocolatey mapping.
 
 ## Implementation Guidance
 
@@ -86,6 +91,6 @@ On macOS, also run:
 ./macos.sh
 ```
 
-The GitHub Actions PR workflow runs hosted check-only smoke tests on Ubuntu, macOS, and Windows. The install smoke workflow also runs real install checks with Linux `apt`, `dnf`, `pacman`, and `zypper` containers, macOS Homebrew, and Windows Chocolatey on PRs, pushes, and the preserved nightly schedule while live package-manager failures are being debugged.
+The GitHub Actions PR workflow runs hosted check-only smoke tests on Ubuntu, macOS, and Windows. The install smoke workflow also runs real install checks with Linux `apt`, `dnf`, `pacman`, and `zypper` containers, macOS Homebrew, and Windows Chocolatey on PRs, pushes, and the preserved nightly schedule while live package-manager failures are being debugged. Windows Chocolatey install smoke allows only the known unsupported Windows mappings (`pre-commit`, `ast-grep`, and `hexdump`) to remain missing.
 
 `shellcheck` and PowerShell validation may require extra local tools. If `pwsh` or Windows is not available, say so in the final response and describe what was statically checked.
