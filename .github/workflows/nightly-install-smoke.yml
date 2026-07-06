@@ -74,14 +74,15 @@ jobs:
           $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
           $checkLog = Join-Path $env:TEMP "setup-tools-url-check.log"
           $scriptPathLiteral = $scriptPath.Replace("'", "''")
-          $checkLogLiteral = $checkLog.Replace("'", "''")
           $childCommand = @"
           & '$scriptPathLiteral' -InstallMissing -Manager choco
-          & '$scriptPathLiteral' -CheckOnly | Tee-Object -FilePath '$checkLogLiteral'
+          & '$scriptPathLiteral' -CheckOnly
           "@
-          & $powershell -NoProfile -ExecutionPolicy Bypass -Command $childCommand
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $childOutput = & $powershell -NoProfile -ExecutionPolicy Bypass -Command $childCommand 2>&1
+          $childExitCode = $LASTEXITCODE
+          $childOutput | Tee-Object -FilePath $checkLog
+          if ($childExitCode -ne 0) {
+            exit $childExitCode
           }
           if (-not (Select-String -Path $checkLog -SimpleMatch "Version checks failed:  0" -Quiet)) {
             throw "Expected Windows check-only version checks to be 0."
@@ -180,14 +181,15 @@ jobs:
           $checkLog = Join-Path $env:TEMP "setup-tools-check.log"
           $scriptPath = (Resolve-Path .\windows.ps1).Path
           $scriptPathLiteral = $scriptPath.Replace("'", "''")
-          $checkLogLiteral = $checkLog.Replace("'", "''")
           $childCommand = @"
           & '$scriptPathLiteral' -InstallMissing -Manager choco
-          & '$scriptPathLiteral' -CheckOnly | Tee-Object -FilePath '$checkLogLiteral'
+          & '$scriptPathLiteral' -CheckOnly
           "@
-          & $powershell -NoProfile -ExecutionPolicy Bypass -Command $childCommand
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $childOutput = & $powershell -NoProfile -ExecutionPolicy Bypass -Command $childCommand 2>&1
+          $childExitCode = $LASTEXITCODE
+          $childOutput | Tee-Object -FilePath $checkLog
+          if ($childExitCode -ne 0) {
+            exit $childExitCode
           }
           if (-not (Select-String -Path $checkLog -SimpleMatch "Version checks failed:  0" -Quiet)) {
             throw "Expected Windows check-only version checks to be 0."
