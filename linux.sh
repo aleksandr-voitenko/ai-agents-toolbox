@@ -99,7 +99,7 @@ hexdump|hexdump|bsdextrautils|util-linux|util-linux|util-linux
 stat|stat|coreutils|coreutils|coreutils|coreutils
 realpath|realpath|coreutils|coreutils|coreutils|coreutils
 uv|uv|github-release:uv|uv|uv|github-release:uv
-pre-commit|pre-commit|pre-commit|pre-commit|pre-commit|github-release:pre-commit
+pre-commit|pre-commit|pre-commit|pre-commit|pre-commit|uv-tool:pre-commit
 ast-grep|ast-grep|github-release:ast-grep|github-release:ast-grep|ast-grep|github-release:ast-grep
 ghostscript|gs|ghostscript|ghostscript|ghostscript|ghostscript
 pdftotext|pdftotext|poppler-utils|poppler-utils|poppler|poppler-tools
@@ -766,60 +766,31 @@ install_ast_grep_release() {
   return "$status"
 }
 
-install_pre_commit_release() {
-  local api_url asset_name asset_url asset_digest wrapper_path tmp_dir status
+install_pre_commit_uv_tool() {
+  if ! have uv; then
+    echo "uv is required to install pre-commit with the uv tool fallback." >&2
+    return 1
+  fi
+  if ! have python3; then
+    echo "python3 is required to install pre-commit with the uv tool fallback." >&2
+    return 1
+  fi
 
-  api_url="https://api.github.com/repos/pre-commit/pre-commit/releases/latest"
-  tmp_dir="$(mktemp -d)"
-  status=0
+  run_elevated install -d -m 0755 /usr/local/share/uv/tools /usr/local/bin
+  run_elevated env UV_TOOL_DIR=/usr/local/share/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin uv tool install --python python3 --no-managed-python --no-python-downloads pre-commit
+}
 
-  (
-    set -e
-    cd "$tmp_dir"
-    download_to_stdout "$api_url" > release.json
-    asset_url="$(sed -n 's#.*"browser_download_url":[[:space:]]*"\([^"]*/pre-commit-[^"/]*\.pyz\)".*#\1#p' release.json | head -n 1)"
-    if [ -z "$asset_url" ]; then
-      echo "Could not find a pre-commit pyz release asset." >&2
-      exit 1
-    fi
-
-    asset_name="${asset_url##*/}"
-    asset_digest="$(sed -n "/\"name\":[[:space:]]*\"$asset_name\"/,/\"browser_download_url\"/s#.*\"digest\":[[:space:]]*\"sha256:\\([a-f0-9]*\\)\".*#\\1#p" release.json | head -n 1)"
-    download_to_stdout "$asset_url" > "$asset_name"
-
-    if have sha256sum; then
-      if [ -z "$asset_digest" ]; then
-        echo "Could not find a GitHub SHA256 digest for $asset_name." >&2
-        exit 1
-      fi
-      printf '%s  %s\n' "$asset_digest" "$asset_name" | sha256sum -c -
-    else
-      echo "sha256sum was not found; skipping pre-commit checksum verification." >&2
-    fi
-
-    run_elevated install -d -m 0755 /usr/local/libexec
-    run_elevated install -m 0644 "$asset_name" /usr/local/libexec/pre-commit.pyz
-
-    # The zipapp hardcodes ~/.cache/pre-commit-zipapp before it runs pre-commit.
-    # Minimal containers can have unusual HOME values, so prove that exact cache
-    # path is usable before falling back to a temporary home.
-    wrapper_path="$tmp_dir/pre-commit-wrapper"
-    {
-      printf '%s\n' '#!/bin/sh'
-      printf '%s\n' "if [ -n \"\${HOME:-}\" ] && mkdir -p \"\$HOME/.cache/pre-commit-zipapp\" 2>/dev/null; then"
-      printf '%s\n' '  :'
-      printf '%s\n' 'else'
-      printf '%s\n' "  HOME=\"\${TMPDIR:-/tmp}/pre-commit-home\""
-      printf '%s\n' '  export HOME'
-      printf '%s\n' "  mkdir -p \"\$HOME/.cache/pre-commit-zipapp\" || exit 1"
-      printf '%s\n' 'fi'
-      printf '%s\n' 'exec python3 /usr/local/libexec/pre-commit.pyz "$@"'
-    } > "$wrapper_path"
-    run_elevated install -m 0755 "$wrapper_path" /usr/local/bin/pre-commit
-  ) || status=$?
-
-  rm -rf "$tmp_dir"
-  return "$status"
+install_uv_tool() {
+  local package="$1"
+  case "$package" in
+    uv-tool:pre-commit)
+      install_pre_commit_uv_tool
+      ;;
+    *)
+      echo "Unsupported uv tool installer: $package" >&2
+      return 1
+      ;;
+  esac
 }
 
 install_github_release_tool() {
@@ -836,9 +807,6 @@ install_github_release_tool() {
       ;;
     github-release:uv)
       install_uv_release
-      ;;
-    github-release:pre-commit)
-      install_pre_commit_release
       ;;
     github-release:ast-grep)
       install_ast_grep_release
@@ -932,6 +900,8 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
       package="$(package_for_manager "$PACKAGE_MANAGER" "$apt_pkg" "$dnf_pkg" "$pacman_pkg" "$zypper_pkg" || true)"
       if [ "${package#github-release:}" != "$package" ]; then
         printf ' installer: upstream GitHub release\n'
+      elif [ "${package#uv-tool:}" != "$package" ]; then
+        printf ' installer: uv tool install\n'
       elif [ -n "$package" ]; then
         printf ' package: %s\n' "$package"
       else
@@ -940,6 +910,8 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
 
       if [ "$INSTALL_MISSING" -eq 1 ] && [ "${package#github-release:}" != "$package" ]; then
         install_github_release_tool "$package"
+      elif [ "$INSTALL_MISSING" -eq 1 ] && [ "${package#uv-tool:}" != "$package" ]; then
+        install_uv_tool "$package"
       elif [ "$INSTALL_MISSING" -eq 1 ] && [ -n "$package" ]; then
         install_package "$PACKAGE_MANAGER" "$package"
       fi

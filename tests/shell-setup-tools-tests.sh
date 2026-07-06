@@ -138,6 +138,7 @@ add_common_shell_utilities() {
   link_utility "$bin_dir" mktemp
   link_utility "$bin_dir" mkdir
   link_utility "$bin_dir" rm
+  link_utility "$bin_dir" chmod
 
   write_executable "$bin_dir/id" \
     'if [ "$1" = "-u" ]; then' \
@@ -239,7 +240,17 @@ add_fake_linux_manager() {
       ;;
     dnf|pacman|zypper)
       write_executable "$bin_dir/$manager" \
-        "printf '$manager %s\n' \"\$*\" >> \"\$FAKE_COMMAND_LOG\""
+        "bin_dir='$bin_dir'" \
+        "printf '$manager %s\n' \"\$*\" >> \"\$FAKE_COMMAND_LOG\"" \
+        'case "$*" in' \
+        '  "install -y python3")' \
+        '    {' \
+        '      printf "#!/bin/sh\n"' \
+        '      printf "printf '\''python3 3.13.0\\n'\''\n"' \
+        '    } > "$bin_dir/python3"' \
+        '    chmod +x "$bin_dir/python3"' \
+        '    ;;' \
+        'esac'
       ;;
     *)
       fail "unsupported fake Linux manager: $manager"
@@ -250,6 +261,7 @@ add_fake_linux_manager() {
 add_fake_flaky_zypper_manager() {
   local bin_dir="$1"
   write_executable "$bin_dir/zypper" \
+    "bin_dir='$bin_dir'" \
     'printf "zypper %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
     'case "$*" in' \
     '  "install -y ripgrep")' \
@@ -258,6 +270,13 @@ add_fake_flaky_zypper_manager() {
     '      : > "$FAKE_ZYPPER_FAILED_ONCE"' \
     '      exit 4' \
     '    fi' \
+    '    ;;' \
+    '  "install -y python3")' \
+    '    {' \
+    '      printf "#!/bin/sh\n"' \
+    '      printf "printf '\''python3 3.13.0\\n'\''\n"' \
+    '    } > "$bin_dir/python3"' \
+    '    chmod +x "$bin_dir/python3"' \
     '    ;;' \
     'esac'
 }
@@ -322,11 +341,6 @@ add_fake_github_release_installers() {
     '    printf "%s\n" "{\"name\":\"uv-i686-unknown-linux-gnu.tar.gz.sha256\"}"' \
     '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/astral-sh/uv/releases/download/0.11.26/uv-i686-unknown-linux-gnu.tar.gz.sha256\"}"' \
     '    ;;' \
-    '  *api.github.com/repos/pre-commit/pre-commit/releases/latest*)' \
-    '    printf "%s\n" "{\"name\":\"pre-commit-4.6.0.pyz\"}"' \
-    '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
-    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/pre-commit/pre-commit/releases/download/v4.6.0/pre-commit-4.6.0.pyz\"}"' \
-    '    ;;' \
     '  *api.github.com/repos/ast-grep/ast-grep/releases/latest*)' \
     '    printf "%s\n" "{\"name\":\"app-x86_64-unknown-linux-gnu.zip\"}"' \
     '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
@@ -373,7 +387,17 @@ add_fake_github_release_installers() {
     ': > sg'
 
   write_executable "$bin_dir/install" \
-    'printf "install %s\n" "$*" >> "$FAKE_COMMAND_LOG"'
+    "bin_dir='$bin_dir'" \
+    'printf "install %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    'case "$*" in' \
+    '  *" /usr/local/bin/uv")' \
+    '    {' \
+    '      printf "#!/bin/sh\n"' \
+    '      printf "printf '\''uv %%s UV_TOOL_DIR=%%s UV_TOOL_BIN_DIR=%%s\\n'\'' \"\$*\" \"\$UV_TOOL_DIR\" \"\$UV_TOOL_BIN_DIR\" >> \"\$FAKE_COMMAND_LOG\"\n"' \
+    '    } > "$bin_dir/uv"' \
+    '    chmod +x "$bin_dir/uv"' \
+    '    ;;' \
+    'esac'
 }
 
 add_fake_rpm_owner() {
@@ -439,7 +463,7 @@ test_linux_check_only_does_not_install() {
 test_linux_install_missing_uses_selected_managers() {
   local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos
   local expected_just expected_difftastic expected_pandoc expected_imagemagick expected_ffmpeg expected_exiftool last_expected
-  local expected_uv expected_pre_commit expected_pre_commit_wrapper expected_ast_grep expected_zip expected_rsync expected_xxd expected_hexdump expected_stat uv_release_dir
+  local expected_uv expected_pre_commit expected_ast_grep expected_zip expected_rsync expected_xxd expected_hexdump expected_stat uv_release_dir
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -467,7 +491,6 @@ test_linux_install_missing_uses_selected_managers() {
         ;;
     esac
 
-    expected_pre_commit_wrapper=""
     case "$manager" in
       apt)
         expected="apt-get install -y ripgrep"
@@ -552,8 +575,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_ffmpeg="zypper install -y ffmpeg-8"
         expected_exiftool="zypper install -y exiftool"
         expected_uv="install -m 0755 $uv_release_dir/uv /usr/local/bin/uv"
-        expected_pre_commit="install -m 0644 pre-commit-4.6.0.pyz /usr/local/libexec/pre-commit.pyz"
-        expected_pre_commit_wrapper="pre-commit-wrapper /usr/local/bin/pre-commit"
+        expected_pre_commit="uv tool install --python python3 --no-managed-python --no-python-downloads pre-commit UV_TOOL_DIR=/usr/local/share/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin"
         expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
         expected_zip="zypper install -y zip"
         expected_rsync="zypper install -y rsync"
@@ -577,9 +599,6 @@ test_linux_install_missing_uses_selected_managers() {
     assert_log_contains "$log" "$expected_exiftool" "linux install should map exiftool for $manager"
     assert_log_contains "$log" "$expected_uv" "linux install should map uv for $manager"
     assert_log_contains "$log" "$expected_pre_commit" "linux install should map pre-commit for $manager"
-    if [ -n "$expected_pre_commit_wrapper" ]; then
-      assert_log_contains "$log" "$expected_pre_commit_wrapper" "linux install should install pre-commit wrapper for $manager"
-    fi
     assert_log_contains "$log" "$expected_ast_grep" "linux install should map ast-grep for $manager"
     assert_log_contains "$log" "$expected_zip" "linux install should map zip for $manager"
     assert_log_contains "$log" "$expected_rsync" "linux install should map rsync for $manager"
