@@ -762,6 +762,30 @@ test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure() {
   assert_not_contains "$output" "version check failed" "linux should not let head/pipefail break verbose FFmpeg checks"
 }
 
+test_linux_uses_uv_tool_metadata_when_pre_commit_version_probe_fails() {
+  local dir bin output metadata_dir
+  dir="$(new_case_dir linux-pre-commit-uv-version)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  metadata_dir="$dir/tools/pre-commit/lib/python3.13/site-packages/pre_commit-4.6.0.dist-info"
+  mkdir -p "$metadata_dir"
+  add_common_shell_utilities "$bin"
+  write_executable "$bin/pre-commit" \
+    'if [ "$1" = "--version" ]; then' \
+    '  printf "pre-commit failed to initialize cache\n" >&2' \
+    '  exit 1' \
+    'fi' \
+    'exit 2'
+  printf 'Metadata-Version: 2.1\nName: pre_commit\nVersion: 4.6.0\n' > "$metadata_dir/METADATA"
+
+  UV_TOOL_DIR="$dir/tools" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "[found]   pre-commit" "linux should find fake pre-commit"
+  assert_contains "$output" "4.6.0" "linux should report the uv tool metadata version"
+  assert_contains "$output" "Version checks failed:  0" "linux should not fail uv-managed pre-commit version checks"
+  assert_not_contains "$output" "version check failed" "linux should not report uv-managed pre-commit as a failed version check"
+}
+
 test_linux_upgrade_managed_uses_owner_only() {
   local dir bin log output
   dir="$(new_case_dir linux-upgrade-managed)"
@@ -985,6 +1009,7 @@ run_test "linux extracts precise version strings" test_linux_extracts_precise_ve
 run_test "linux formats display paths" test_linux_formats_display_paths
 run_test "linux finds vendor_perl ExifTool" test_linux_finds_vendor_perl_exiftool
 run_test "linux verbose FFmpeg version output is not a pipefail failure" test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure
+run_test "linux uses uv tool metadata when pre-commit version probe fails" test_linux_uses_uv_tool_metadata_when_pre_commit_version_probe_fails
 run_test "linux upgrade-managed uses managed owner only" test_linux_upgrade_managed_uses_owner_only
 run_test "linux install-missing without manager prints guidance" test_linux_install_without_manager_prints_guidance
 run_test "macOS check-only does not install" test_macos_check_only_does_not_install

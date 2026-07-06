@@ -186,6 +186,22 @@ version_output() {
   extract_version_from_output "$output"
 }
 
+pre_commit_uv_tool_version() {
+  local tool_dir="${UV_TOOL_DIR:-/usr/local/share/uv/tools}"
+  local metadata version
+
+  for metadata in "$tool_dir"/pre-commit/lib/python*/site-packages/pre_commit-*.dist-info/METADATA; do
+    [ -r "$metadata" ] || continue
+    version="$(sed -n 's/^Version:[[:space:]]*//p' "$metadata" | head -n 1)"
+    if [ -n "$version" ]; then
+      printf '%s\n' "$version"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 extract_version_from_output() {
   local output="$1"
   local line fallback
@@ -232,6 +248,9 @@ version_for() {
       ;;
     exiftool)
       version_output "$command_name" -ver
+      ;;
+    pre-commit)
+      version_output "$command_name" --version || pre_commit_uv_tool_version
       ;;
     hexdump|stat|realpath)
       version_output "$command_name" --version || printf '%s\n' "system utility; no version flag"
