@@ -63,10 +63,10 @@ The scripts manage these logical tools across supported platforms:
 | `unzip` | ZIP archive extraction utility. |
 | `rsync` | Incremental file synchronization and copy utility. |
 | `xxd` | Hex dump and reverse-hex-dump utility. |
-| `hexdump` | Traditional byte-oriented hex dump utility. |
 | `stat` | Filesystem metadata inspection utility. |
 | `realpath` | Canonical path resolution utility. |
 | `uv` | Fast Python package, project, and tool manager. |
+| `pwsh` | PowerShell 7 command shell, managed on Windows only. |
 | `pre-commit` | Framework for managing and running repository pre-commit hooks. |
 | `ast-grep` | AST-aware code search, linting, and rewrite tool. |
 | `ghostscript` (`gs`) | PostScript and PDF interpreter used by document workflows. |
@@ -76,20 +76,25 @@ Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
 the `git-delta` package, `difft` by `difftastic`, and `typos` by Homebrew's
 `typos-cli` formula. Some Linux distributions also package `pandoc`, `ffmpeg`,
-ImageMagick, ExifTool, `xxd`, `hexdump`, `stat`, and `realpath` under
-distribution-specific names or paths.
+ImageMagick, ExifTool, `xxd`, `stat`, and `realpath` under distribution-specific
+names or paths.
 
 Some requested tools are supplied by default operating-system utilities on many
 machines. For example, macOS normally provides `tar`, `zip`, `unzip`, `rsync`,
-`xxd`, `hexdump`, `stat`, and `realpath`; Homebrew fallback packages may expose
+`xxd`, `stat`, and `realpath`; Homebrew fallback packages may expose
 GNU-prefixed command names such as `gtar`, `gstat`, and `grealpath`. Linux
 fallbacks install upstream `uv` and `ast-grep` release assets only where default
 distribution repositories do not provide native packages; openSUSE uses the
 newly installed `uv` to install `pre-commit` when zypper has no native package.
-On Windows,
-`pre-commit` and `hexdump` are detected when already available on `PATH`, but
-they currently have no verified package mapping through winget, Scoop, or
-Chocolatey.
+Some tools are intentionally platform-specific. `rsync` is managed on Linux and
+macOS, but is not a Windows requirement. Windows additionally manages `pwsh`
+through winget's `Microsoft.PowerShell` package; Linux and macOS do not require
+it. On Windows, `pre-commit` is installed with `uv tool install` when `uv` and
+Python are available, and uv-managed `pre-commit` commands are reported with
+`uv:pre-commit` as their source. `ast-grep` has winget and Scoop mappings but no
+verified Chocolatey package. Machine-wide Chocolatey installs are skipped in
+auto install mode when the current shell is not elevated, because they normally
+write under `C:\ProgramData\chocolatey`.
 
 ## One-Line Installers
 
@@ -299,10 +304,9 @@ upgrade behavior without touching real package managers.
 
 The install smoke workflow also runs the opt-in install path on disposable
 Linux distro containers, macOS with Homebrew, and Windows with Chocolatey. The
-Windows Chocolatey smoke permits only the known unsupported Windows mappings
-(`pre-commit`, `ast-grep`, and `hexdump`) to remain missing. It is enabled for
-pull requests, pushes, and its nightly schedule while live package-manager
-failures are being debugged.
+Windows Chocolatey smoke permits only the known unsupported Chocolatey mapping
+for `ast-grep` to remain missing. It is enabled for pull requests, pushes, and
+its nightly schedule while live package-manager failures are being debugged.
 
 Run the hermetic tests locally with:
 

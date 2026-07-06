@@ -463,7 +463,7 @@ test_linux_check_only_does_not_install() {
 test_linux_install_missing_uses_selected_managers() {
   local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos
   local expected_just expected_difftastic expected_pandoc expected_imagemagick expected_ffmpeg expected_exiftool last_expected
-  local expected_uv expected_pre_commit expected_ast_grep expected_zip expected_rsync expected_xxd expected_hexdump expected_stat uv_release_dir
+  local expected_uv expected_pre_commit expected_ast_grep expected_zip expected_rsync expected_xxd expected_stat uv_release_dir
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -511,7 +511,6 @@ test_linux_install_missing_uses_selected_managers() {
         expected_zip="apt-get install -y zip"
         expected_rsync="apt-get install -y rsync"
         expected_xxd="apt-get install -y xxd"
-        expected_hexdump="apt-get install -y bsdextrautils"
         expected_stat="apt-get install -y coreutils"
         last_expected="apt-get install -y poppler-utils"
         ;;
@@ -534,7 +533,6 @@ test_linux_install_missing_uses_selected_managers() {
         expected_zip="dnf install -y zip"
         expected_rsync="dnf install -y rsync"
         expected_xxd="dnf install -y xxd"
-        expected_hexdump="dnf install -y util-linux"
         expected_stat="dnf install -y coreutils"
         last_expected="dnf install -y poppler-utils"
         ;;
@@ -557,7 +555,6 @@ test_linux_install_missing_uses_selected_managers() {
         expected_zip="pacman -S --needed --noconfirm zip"
         expected_rsync="pacman -S --needed --noconfirm rsync"
         expected_xxd="pacman -S --needed --noconfirm vim"
-        expected_hexdump="pacman -S --needed --noconfirm util-linux"
         expected_stat="pacman -S --needed --noconfirm coreutils"
         last_expected="pacman -S --needed --noconfirm poppler"
         ;;
@@ -580,7 +577,6 @@ test_linux_install_missing_uses_selected_managers() {
         expected_zip="zypper install -y zip"
         expected_rsync="zypper install -y rsync"
         expected_xxd="zypper install -y vim"
-        expected_hexdump="zypper install -y util-linux"
         expected_stat="zypper install -y coreutils"
         last_expected="zypper install -y poppler-tools"
         ;;
@@ -603,7 +599,6 @@ test_linux_install_missing_uses_selected_managers() {
     assert_log_contains "$log" "$expected_zip" "linux install should map zip for $manager"
     assert_log_contains "$log" "$expected_rsync" "linux install should map rsync for $manager"
     assert_log_contains "$log" "$expected_xxd" "linux install should map xxd for $manager"
-    assert_log_contains "$log" "$expected_hexdump" "linux install should map hexdump for $manager"
     assert_log_contains "$log" "$expected_stat" "linux install should map stat/realpath for $manager"
     assert_log_contains "$log" "$last_expected" "linux install should keep processing tools after $manager invokes a package command"
     if [ "$manager" = "apt" ]; then
@@ -778,9 +773,10 @@ test_linux_uses_uv_tool_metadata_when_pre_commit_version_probe_fails() {
     'exit 2'
   printf 'Metadata-Version: 2.1\nName: pre_commit\nVersion: 4.6.0\n' > "$metadata_dir/METADATA"
 
-  UV_TOOL_DIR="$dir/tools" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+  UV_TOOL_DIR="$dir/tools" UV_TOOL_BIN_DIR="$bin" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
 
   assert_contains "$output" "[found]   pre-commit" "linux should find fake pre-commit"
+  assert_contains "$output" "uv:pre-commit" "linux should report uv ownership for uv-managed pre-commit"
   assert_contains "$output" "4.6.0" "linux should report the uv tool metadata version"
   assert_contains "$output" "Version checks failed:  0" "linux should not fail uv-managed pre-commit version checks"
   assert_not_contains "$output" "version check failed" "linux should not report uv-managed pre-commit as a failed version check"
@@ -866,11 +862,36 @@ test_macos_install_missing_uses_brew() {
   assert_log_contains "$log" "brew install unzip" "macOS install should map unzip to Homebrew"
   assert_log_contains "$log" "brew install rsync" "macOS install should map rsync to Homebrew"
   assert_log_contains "$log" "brew install vim" "macOS install should map xxd to Vim"
-  assert_log_contains "$log" "brew install util-linux" "macOS install should map hexdump to util-linux"
   assert_log_contains "$log" "brew install coreutils" "macOS install should map stat and realpath to coreutils"
   assert_log_contains "$log" "brew install uv" "macOS install should map uv to Homebrew"
   assert_log_contains "$log" "brew install pre-commit" "macOS install should map pre-commit to Homebrew"
   assert_log_contains "$log" "brew install ast-grep" "macOS install should map ast-grep to Homebrew"
+}
+
+test_macos_reports_uv_managed_pre_commit_source() {
+  local dir bin output metadata_dir uv_bin
+  dir="$(new_case_dir macos-pre-commit-uv-source)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  uv_bin="$dir/uv-bin"
+  metadata_dir="$dir/tools/pre-commit/lib/python3.13/site-packages/pre_commit-4.6.0.dist-info"
+  mkdir -p "$uv_bin" "$metadata_dir"
+  add_common_shell_utilities "$bin"
+  write_executable "$uv_bin/pre-commit" \
+    'if [ "$1" = "--version" ]; then' \
+    '  printf "pre-commit failed to initialize cache\n" >&2' \
+    '  exit 1' \
+    'fi' \
+    'exit 2'
+  printf 'Metadata-Version: 2.1\nName: pre_commit\nVersion: 4.6.0\n' > "$metadata_dir/METADATA"
+
+  UV_TOOL_DIR="$dir/tools" UV_TOOL_BIN_DIR="$uv_bin" run_with_path "$output" "$uv_bin:$bin" /bin/bash "$ROOT_DIR/macos.sh"
+
+  assert_contains "$output" "[found]   pre-commit" "macOS should find fake uv-managed pre-commit"
+  assert_contains "$output" "uv:pre-commit" "macOS should report uv ownership for uv-managed pre-commit"
+  assert_contains "$output" "4.6.0" "macOS should report the uv tool metadata version"
+  assert_contains "$output" "Version checks failed:  0" "macOS should not fail uv-managed pre-commit version checks"
+  assert_not_contains "$output" "version check failed" "macOS should not report uv-managed pre-commit as a failed version check"
 }
 
 test_macos_install_without_brew_prints_guidance() {
@@ -1019,4 +1040,5 @@ run_test "macOS empty successful version output is not a failure" test_macos_emp
 run_test "macOS caps long version output" test_macos_caps_long_version_output
 run_test "macOS extracts precise version strings" test_macos_extracts_precise_version_strings
 run_test "macOS formats display paths" test_macos_formats_display_paths
+run_test "macOS reports uv-managed pre-commit source" test_macos_reports_uv_managed_pre_commit_source
 run_test "macOS upgrade-managed uses Homebrew owner" test_macos_upgrade_managed_uses_homebrew_owner

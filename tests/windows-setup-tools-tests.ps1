@@ -217,6 +217,49 @@ function Add-FakePythonWindowsAppsAlias {
   return $windowsApps
 }
 
+function Add-FakeUvTool {
+  param([pscustomobject]$Context)
+
+  $uvTools = Join-Path $Context.Root "uv\tools"
+  $uvBin = Join-Path $Context.Root "uv\bin"
+  New-Item -ItemType Directory -Force -Path $uvTools, $uvBin | Out-Null
+
+  Write-CmdFile -Path (Join-Path $Context.Bin "uv.cmd") -Lines @(
+    'echo uv %* UV_TOOL_DIR=%UV_TOOL_DIR% UV_TOOL_BIN_DIR=%UV_TOOL_BIN_DIR%>>"%FAKE_COMMAND_LOG%"',
+    "if /I ""%1""==""tool"" if /I ""%2""==""dir"" if /I ""%3""==""--bin"" echo $uvBin& exit /b 0",
+    "if /I ""%1""==""tool"" if /I ""%2""==""dir"" if ""%3""=="""" echo $uvTools& exit /b 0",
+    'if /I "%1"=="tool" if /I "%2"=="install" exit /b 0',
+    'echo uv 0.11.0',
+    'exit /b 0'
+  )
+
+  [pscustomobject]@{
+    Tools = $uvTools
+    Bin = $uvBin
+  }
+}
+
+function Add-FakeUvManagedPreCommit {
+  param([pscustomobject]$Context)
+
+  $uv = Add-FakeUvTool $Context
+  $metadataDir = Join-Path $uv.Tools "pre-commit\Lib\site-packages\pre_commit-4.6.0.dist-info"
+  New-Item -ItemType Directory -Force -Path $metadataDir | Out-Null
+  Set-Content -Path (Join-Path $metadataDir "METADATA") -Encoding ASCII -Value @(
+    "Metadata-Version: 2.1",
+    "Name: pre_commit",
+    "Version: 4.6.0"
+  )
+
+  Write-CmdFile -Path (Join-Path $uv.Bin "pre-commit.cmd") -Lines @(
+    'if /I "%1"=="--version" echo pre-commit failed to initialize cache 1>&2',
+    'if /I "%1"=="--version" exit /b 1',
+    'exit /b 2'
+  )
+
+  return $uv
+}
+
 function Add-FakeManager {
   param(
     [string]$Directory,
@@ -399,6 +442,7 @@ try {
         Assert-LogContains $ctx.Log "winget install --id Gyan.FFmpeg" "Windows should install ffmpeg with winget"
         Assert-LogContains $ctx.Log "winget install --id OliverBetz.ExifTool" "Windows should install exiftool with winget"
         Assert-LogContains $ctx.Log "winget install --id astral-sh.uv" "Windows should install uv with winget"
+        Assert-LogContains $ctx.Log "winget install --id Microsoft.PowerShell" "Windows should install PowerShell with winget"
         Assert-LogContains $ctx.Log "winget install --id ast-grep.ast-grep" "Windows should install ast-grep with winget"
         Assert-LogContains $ctx.Log "winget install --id Microsoft.Coreutils" "Windows should install stat and realpath with winget"
         Assert-LogNotContains $ctx.Log "winget install --id dandavison" "Windows should not use an unverified delta winget id"
@@ -406,7 +450,7 @@ try {
         Assert-LogNotContains $ctx.Log "winget install --id GnuWin32.File" "Windows should not use the GnuWin32 file winget package"
         Assert-LogNotContains $ctx.Log "winget install --id ArtifexSoftware.Ghostscript" "Windows should not use an unavailable Ghostscript winget id"
         Assert-LogNotContains $ctx.Log "winget install --id pre-commit" "Windows should not use an unverified pre-commit winget id"
-        Assert-LogNotContains $ctx.Log "winget install --id hexdump" "Windows should not use an unverified hexdump winget id"
+        Assert-NotContains $output "[missing] hexdump" "Windows should not report hexdump as a managed tool"
         Assert-Contains $output "[missing] file           package not available via detected manager(s)" "Windows should explain when a tool is not installable through detected managers"
         Assert-Contains $output "Some missing tools need a different package manager:" "Windows should summarize tools that need another package manager"
         Assert-Contains $output "file: available via Scoop or Chocolatey" "Windows should name alternate managers for file"
@@ -432,9 +476,11 @@ try {
         Assert-LogContains $ctx.Log "scoop install zip" "Windows should install zip with Scoop"
         Assert-LogContains $ctx.Log "scoop install unzip" "Windows should install unzip with Scoop"
         Assert-LogContains $ctx.Log "scoop install vim" "Windows should install xxd with Scoop via Vim"
-        Assert-LogContains $ctx.Log "scoop install coreutils" "Windows should install stat and realpath with Scoop"
+        Assert-LogContains $ctx.Log "scoop install microsoft-coreutils" "Windows should install stat and realpath with Scoop"
         Assert-LogNotContains $ctx.Log "scoop install pre-commit" "Windows should not use an unverified pre-commit Scoop package"
-        Assert-LogNotContains $ctx.Log "scoop install hexdump" "Windows should not use an unverified hexdump Scoop package"
+        Assert-LogNotContains $ctx.Log "scoop install pwsh" "Windows should not install PowerShell with Scoop"
+        Assert-NotContains $output "[missing] hexdump" "Windows should not report hexdump as a managed tool"
+        Assert-NotContains $output "[missing] rsync" "Windows should not report rsync as a Windows-managed tool"
       } else {
         Assert-LogContains $ctx.Log "choco install ripgrep -y" "Windows should install ripgrep with Chocolatey"
         Assert-LogContains $ctx.Log "choco install sqlite -y" "Windows should install sqlite3 with Chocolatey"
@@ -452,14 +498,42 @@ try {
         Assert-LogContains $ctx.Log "choco install uv -y" "Windows should install uv with Chocolatey"
         Assert-LogContains $ctx.Log "choco install zip -y" "Windows should install zip with Chocolatey"
         Assert-LogContains $ctx.Log "choco install unzip -y" "Windows should install unzip with Chocolatey"
-        Assert-LogContains $ctx.Log "choco install rsync -y" "Windows should install rsync with Chocolatey"
+        Assert-LogNotContains $ctx.Log "choco install rsync -y" "Windows should not install rsync with Chocolatey"
         Assert-LogContains $ctx.Log "choco install xxd -y" "Windows should install xxd with Chocolatey"
         Assert-LogContains $ctx.Log "choco install mscoreutils -y" "Windows should install stat and realpath with Chocolatey"
         Assert-LogNotContains $ctx.Log "choco install pre-commit -y" "Windows should not use an unavailable pre-commit Chocolatey package"
+        Assert-LogNotContains $ctx.Log "choco install pwsh -y" "Windows should not install PowerShell with Chocolatey"
         Assert-LogNotContains $ctx.Log "choco install ast-grep -y" "Windows should not use an unavailable ast-grep Chocolatey package"
-        Assert-LogNotContains $ctx.Log "choco install hexdump -y" "Windows should not use an unavailable hexdump Chocolatey package"
+        Assert-NotContains $output "[missing] hexdump" "Windows should not report hexdump as a managed tool"
+        Assert-NotContains $output "[missing] rsync" "Windows should not report rsync as a Windows-managed tool"
       }
     }
+  }
+
+  Run-Test "Windows reports uv-managed pre-commit source" {
+    $ctx = New-TestContext "uv-pre-commit-source"
+    $uv = Add-FakeUvManagedPreCommit $ctx
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true } @($uv.Bin)
+
+    Assert-Contains $output "[found]   pre-commit" "Windows should find fake uv-managed pre-commit"
+    Assert-Contains $output "uv:pre-commit" "Windows should report uv ownership for uv-managed pre-commit"
+    Assert-Contains $output "4.6.0" "Windows should use uv tool metadata when the pre-commit version probe fails"
+    Assert-Contains $output "Version checks failed:  0" "Windows should not fail uv-managed pre-commit version checks"
+    Assert-NotContains $output "version check failed" "Windows should not report uv-managed pre-commit as a failed version check"
+  }
+
+  Run-Test "Windows installs pre-commit with uv when uv is available" {
+    $ctx = New-TestContext "uv-pre-commit-install"
+    Add-FakeUvTool $ctx | Out-Null
+    Add-FakeTool $ctx.Bin "python"
+
+    $output = Invoke-Setup $ctx @{ InstallMissing = $true; Manager = "choco" }
+
+    Assert-Contains $output "[missing] pre-commit" "Windows should report pre-commit missing before uv tool install"
+    Assert-Contains $output "installer: uv tool install" "Windows should identify the uv tool installer for pre-commit"
+    Assert-LogContains $ctx.Log "uv tool install --python python --no-managed-python --no-python-downloads pre-commit" "Windows should install pre-commit with uv instead of Chocolatey"
+    Assert-LogNotContains $ctx.Log "choco install pre-commit -y" "Windows should not install pre-commit with Chocolatey"
   }
 
   Run-Test "Windows auto install uses Scoop for tools without reliable winget packages" {
@@ -475,6 +549,34 @@ try {
     Assert-LogContains $ctx.Log "scoop install ghostscript" "Windows should install Ghostscript with Scoop when winget is unavailable"
     Assert-LogNotContains $ctx.Log "winget install --id GnuWin32.File" "Windows should not choose the old GnuWin32 file winget package in auto mode"
     Assert-LogNotContains $ctx.Log "winget install --id ArtifexSoftware.Ghostscript" "Windows should not choose the unavailable Ghostscript winget id in auto mode"
+  }
+
+  Run-Test "Windows explicit choco fails before non-elevated machine-wide Chocolatey" {
+    $ctx = New-TestContext "explicit-choco-non-admin"
+    $chocoRoot = Join-Path $ctx.Root "chocolatey"
+    $chocoBin = Join-Path $chocoRoot "bin"
+    New-Item -ItemType Directory -Force -Path $chocoBin | Out-Null
+    Add-FakeManager $chocoBin "choco"
+
+    $oldChocolateyInstall = $env:ChocolateyInstall
+    $oldAdminOverride = $env:AI_AGENTS_TOOLBOX_WINDOWS_IS_ADMIN
+    $errorText = $null
+    try {
+      $env:ChocolateyInstall = $chocoRoot
+      $env:AI_AGENTS_TOOLBOX_WINDOWS_IS_ADMIN = "0"
+      try {
+        Invoke-Setup $ctx @{ InstallMissing = $true; Manager = "choco" } @($chocoBin) | Out-Null
+        Fail "Windows should fail before invoking non-elevated machine-wide Chocolatey"
+      } catch {
+        $errorText = "$($_.Exception.Message)"
+      }
+    } finally {
+      $env:ChocolateyInstall = $oldChocolateyInstall
+      $env:AI_AGENTS_TOOLBOX_WINDOWS_IS_ADMIN = $oldAdminOverride
+    }
+
+    Assert-Contains $errorText "Chocolatey install is unavailable in this shell (requires elevated shell)." "Windows should explain why machine-wide Chocolatey is blocked"
+    Assert-LogNotContains $ctx.Log "choco install ripgrep -y" "Windows should not invoke machine-wide Chocolatey from a non-elevated shell"
   }
 
   Run-Test "Windows upgrade-managed uses winget owner" {

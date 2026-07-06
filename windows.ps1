@@ -68,13 +68,12 @@ $Tools = @(
   @{ Name = "tar"; Commands = @("tar.exe", "tar"); Winget = $null; Scoop = $null; Choco = $null },
   @{ Name = "zip"; Commands = @("zip.exe", "zip"); Winget = $null; Scoop = "zip"; Choco = "zip" },
   @{ Name = "unzip"; Commands = @("unzip.exe", "unzip"); Winget = $null; Scoop = "unzip"; Choco = "unzip" },
-  @{ Name = "rsync"; Commands = @("rsync.exe", "rsync"); Winget = $null; Scoop = $null; Choco = "rsync" },
   @{ Name = "xxd"; Commands = @("xxd.exe", "xxd"); Winget = $null; Scoop = "vim"; Choco = "xxd" },
-  @{ Name = "hexdump"; Commands = @("hexdump.exe", "hexdump"); Winget = $null; Scoop = $null; Choco = $null },
-  @{ Name = "stat"; Commands = @("stat.exe", "stat"); Winget = "Microsoft.Coreutils"; Scoop = "coreutils"; Choco = "mscoreutils" },
-  @{ Name = "realpath"; Commands = @("realpath.exe", "realpath"); Winget = "Microsoft.Coreutils"; Scoop = "coreutils"; Choco = "mscoreutils" },
+  @{ Name = "stat"; Commands = @("stat.exe", "stat"); Winget = "Microsoft.Coreutils"; Scoop = "microsoft-coreutils"; Choco = "mscoreutils" },
+  @{ Name = "realpath"; Commands = @("realpath.exe", "realpath"); Winget = "Microsoft.Coreutils"; Scoop = "microsoft-coreutils"; Choco = "mscoreutils" },
   @{ Name = "uv"; Commands = @("uv.exe", "uv"); Winget = "astral-sh.uv"; Scoop = "uv"; Choco = "uv" },
-  @{ Name = "pre-commit"; Commands = @("pre-commit.exe", "pre-commit"); Winget = $null; Scoop = $null; Choco = $null },
+  @{ Name = "pwsh"; Commands = @("pwsh.exe", "pwsh"); Winget = "Microsoft.PowerShell"; Scoop = $null; Choco = $null },
+  @{ Name = "pre-commit"; Commands = @("pre-commit.exe", "pre-commit"); Winget = $null; Scoop = $null; Choco = $null; UvTool = "pre-commit" },
   @{ Name = "ast-grep"; Commands = @("ast-grep.exe", "ast-grep"); Winget = "ast-grep.ast-grep"; Scoop = "ast-grep"; Choco = $null },
   @{ Name = "ghostscript"; Commands = @("gswin64c.exe", "gswin32c.exe", "gs.exe", "gs"); Winget = $null; Scoop = "ghostscript"; Choco = "ghostscript" },
   @{ Name = "pdftotext"; Commands = @("pdftotext.exe", "pdftotext"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler" }
@@ -83,6 +82,84 @@ $Tools = @(
 function Test-CommandExists {
   param([string]$Name)
   return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Test-WindowsAdministrator {
+  if ($env:AI_AGENTS_TOOLBOX_WINDOWS_IS_ADMIN -eq "1") {
+    return $true
+  }
+  if ($env:AI_AGENTS_TOOLBOX_WINDOWS_IS_ADMIN -eq "0") {
+    return $false
+  }
+
+  try {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  } catch {
+    return $false
+  }
+}
+
+function Test-PathUnderRoot {
+  param(
+    [string]$Path,
+    [string]$Root
+  )
+
+  if (-not $Path -or -not $Root) {
+    return $false
+  }
+
+  $comparison = [System.StringComparison]::OrdinalIgnoreCase
+  try {
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd("\", "/")
+  } catch {
+    return $false
+  }
+
+  return $fullPath.Equals($fullRoot, $comparison) -or
+    $fullPath.StartsWith("$fullRoot\", $comparison) -or
+    $fullPath.StartsWith("$fullRoot/", $comparison)
+}
+
+function Get-ChocolateyInstallRoot {
+  if ($env:ChocolateyInstall) {
+    return $env:ChocolateyInstall
+  }
+  if ($env:ProgramData) {
+    return (Join-Path $env:ProgramData "chocolatey")
+  }
+  return $null
+}
+
+function Test-ChocolateyRequiresElevation {
+  if (-not (Test-CommandExists "choco") -or (Test-WindowsAdministrator)) {
+    return $false
+  }
+
+  $chocoRoot = Get-ChocolateyInstallRoot
+  if (-not $chocoRoot) {
+    return $false
+  }
+
+  $chocoCommand = Get-Command "choco" -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($null -eq $chocoCommand) {
+    return $false
+  }
+
+  return Test-PathUnderRoot $chocoCommand.Source $chocoRoot
+}
+
+function Get-InstallManagerBlockReason {
+  param([string]$InstallManager)
+
+  if ($InstallManager -eq "choco" -and (Test-ChocolateyRequiresElevation)) {
+    return "requires elevated shell"
+  }
+
+  return $null
 }
 
 function Test-WindowsPythonAppExecutionAlias {
@@ -179,6 +256,157 @@ function Test-ChocoInstalled {
   }
 }
 
+function Get-FirstNonEmptyLine {
+  param([object[]]$Output)
+
+  foreach ($entry in $Output) {
+    foreach ($line in ("$entry" -split '\r?\n')) {
+      $trimmed = $line.Trim()
+      if ($trimmed) {
+        return $trimmed
+      }
+    }
+  }
+
+  return $null
+}
+
+function Get-UvToolDir {
+  if ($env:UV_TOOL_DIR) {
+    return $env:UV_TOOL_DIR
+  }
+
+  if (Test-CommandExists "uv") {
+    try {
+      $output = uv tool dir 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        $toolDir = Get-FirstNonEmptyLine $output
+        if ($toolDir) {
+          return $toolDir
+        }
+      }
+    } catch {
+      # Fall through to uv's documented Windows default below.
+    }
+  }
+
+  if ($env:APPDATA) {
+    return (Join-Path $env:APPDATA "uv\tools")
+  }
+
+  return $null
+}
+
+function Get-UvToolBinDir {
+  if ($env:UV_TOOL_BIN_DIR) {
+    return $env:UV_TOOL_BIN_DIR
+  }
+
+  if (Test-CommandExists "uv") {
+    try {
+      $output = uv tool dir --bin 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        $toolBinDir = Get-FirstNonEmptyLine $output
+        if ($toolBinDir) {
+          return $toolBinDir
+        }
+      }
+    } catch {
+      # Fall through to uv's documented Windows default below.
+    }
+  }
+
+  if ($env:USERPROFILE) {
+    return (Join-Path $env:USERPROFILE ".local\bin")
+  }
+
+  return $null
+}
+
+function Get-UvToolMetadataVersion {
+  param(
+    [string]$ToolName,
+    [string]$DistInfoPrefix
+  )
+
+  $toolDir = Get-UvToolDir
+  if (-not $toolDir) {
+    return $null
+  }
+
+  $toolRoot = Join-Path $toolDir $ToolName
+  if (-not (Test-Path -LiteralPath $toolRoot)) {
+    return $null
+  }
+
+  try {
+    $metadataFiles = Get-ChildItem -LiteralPath $toolRoot -Recurse -Filter "METADATA" -File -ErrorAction SilentlyContinue
+  } catch {
+    return $null
+  }
+
+  foreach ($metadata in $metadataFiles) {
+    $distInfoDir = Split-Path -Leaf (Split-Path -Parent $metadata.FullName)
+    if ($distInfoDir -notlike "$DistInfoPrefix-*.dist-info") {
+      continue
+    }
+
+    $versionLine = Get-Content -LiteralPath $metadata.FullName -ErrorAction SilentlyContinue |
+      Where-Object { "$_" -match '^Version:\s*(.+)$' } |
+      Select-Object -First 1
+    if ($versionLine -and "$versionLine" -match '^Version:\s*(.+)$') {
+      return $Matches[1].Trim()
+    }
+  }
+
+  return $null
+}
+
+function Get-UvToolMetadataVersionForTool {
+  param([hashtable]$Tool)
+
+  if ($null -eq $Tool -or -not $Tool.UvTool) {
+    return $null
+  }
+
+  if ($Tool.UvTool -eq "pre-commit") {
+    return Get-UvToolMetadataVersion "pre-commit" "pre_commit"
+  }
+
+  return $null
+}
+
+function Test-UvManagedToolPath {
+  param(
+    [string]$Path,
+    [hashtable]$Tool
+  )
+
+  if ($null -eq $Tool -or -not $Tool.UvTool -or -not $Path) {
+    return $false
+  }
+
+  if (-not (Get-UvToolMetadataVersionForTool $Tool)) {
+    return $false
+  }
+
+  $uvBinDir = Get-UvToolBinDir
+  if (-not $uvBinDir) {
+    return $false
+  }
+
+  $comparison = [System.StringComparison]::OrdinalIgnoreCase
+  try {
+    $commandPath = [System.IO.Path]::GetFullPath($Path)
+    $toolBinPath = [System.IO.Path]::GetFullPath($uvBinDir)
+  } catch {
+    return $false
+  }
+
+  $toolBinPath = $toolBinPath.TrimEnd("\", "/")
+  return $commandPath.StartsWith("$toolBinPath\", $comparison) -or $commandPath.StartsWith("$toolBinPath/", $comparison)
+}
+
 function Get-ToolSource {
   param(
     [string]$Path,
@@ -186,6 +414,10 @@ function Get-ToolSource {
   )
 
   $normalized = $Path.ToLowerInvariant()
+
+  if (Test-UvManagedToolPath $Path $Tool) {
+    return "uv:$($Tool.UvTool)"
+  }
 
   if ($normalized -like "*\scoop\*" -or $normalized -like "*\scoop\shims\*") {
     if (Test-ScoopInstalled $Tool.Scoop) {
@@ -277,7 +509,10 @@ function Get-VersionFromOutput {
 }
 
 function Get-VersionLine {
-  param([System.Management.Automation.CommandInfo]$Command)
+  param(
+    [System.Management.Automation.CommandInfo]$Command,
+    [hashtable]$Tool = $null
+  )
 
   $commandName = [System.IO.Path]::GetFileName($Command.Source)
   if (-not $commandName) {
@@ -316,7 +551,13 @@ function Get-VersionLine {
           return $versionFromOutput
         }
       }
-      if ($baseName -eq "hexdump" -or $baseName -eq "stat" -or $baseName -eq "realpath") {
+      if ($null -ne $Tool -and (Test-UvManagedToolPath $commandPath $Tool)) {
+        $metadataVersion = Get-UvToolMetadataVersionForTool $Tool
+        if ($metadataVersion) {
+          return $metadataVersion
+        }
+      }
+      if ($baseName -eq "stat" -or $baseName -eq "realpath") {
         return "system utility; no version flag"
       }
       return "version check failed"
@@ -413,6 +654,12 @@ function Get-PackageVersionForSource {
       if ($line) { return "package version: $("$line".Trim() -replace '\|', ' ')" }
       return $null
     }
+
+    if ($sourceManager -eq "uv" -and $package -eq "pre-commit") {
+      $version = Get-UvToolMetadataVersion "pre-commit" "pre_commit"
+      if ($version) { return "package version: pre-commit $version" }
+      return $null
+    }
   } catch {
     return $null
   }
@@ -431,6 +678,10 @@ function Get-AvailableManagers {
 function Get-InstallManager {
   param([hashtable]$Tool)
 
+  if ($Tool.UvTool -and (Test-CommandExists "uv") -and (Test-CommandExists "python")) {
+    return "uv"
+  }
+
   $available = Get-AvailableManagers
   $candidates = @()
 
@@ -442,6 +693,9 @@ function Get-InstallManager {
 
   foreach ($candidate in $candidates) {
     if ($available -notcontains $candidate) {
+      continue
+    }
+    if ($Manager -eq "auto" -and (Get-InstallManagerBlockReason $candidate)) {
       continue
     }
     if ($candidate -eq "winget" -and $Tool.Winget) { return "winget" }
@@ -460,6 +714,28 @@ function Get-ToolMappedManagers {
   if ($Tool.Scoop) { $mapped += "scoop" }
   if ($Tool.Choco) { $mapped += "choco" }
   return $mapped
+}
+
+function Get-ToolBlockedManagers {
+  param([hashtable]$Tool)
+
+  $available = Get-AvailableManagers
+  $blocked = @()
+  foreach ($manager in (Get-ToolMappedManagers $Tool)) {
+    if ($available -notcontains $manager) {
+      continue
+    }
+
+    $reason = Get-InstallManagerBlockReason $manager
+    if ($reason) {
+      $blocked += [pscustomobject]@{
+        Manager = $manager
+        Reason = $reason
+      }
+    }
+  }
+
+  return $blocked
 }
 
 function Format-ManagerName {
@@ -569,11 +845,34 @@ function Install-Tool {
   }
 
   if ($InstallManager -eq "choco") {
+    $blockReason = Get-InstallManagerBlockReason $InstallManager
+    if ($blockReason) {
+      throw "Chocolatey install is unavailable in this shell ($blockReason). Re-run PowerShell as Administrator, or use a non-elevated package manager such as Scoop or winget."
+    }
+
     Write-Host "Installing $($Tool.Name) with Chocolatey..."
     choco install $Tool.Choco -y
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
       throw "Install failed for $($Tool.Name) with choco package $($Tool.Choco) (exit code $exitCode)."
+    }
+    return
+  }
+
+  if ($InstallManager -eq "uv") {
+    Write-Host "Installing $($Tool.Name) with uv tool install..."
+    uv tool install --python python --no-managed-python --no-python-downloads $Tool.UvTool
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+      throw "Install failed for $($Tool.Name) with uv tool package $($Tool.UvTool) (exit code $exitCode)."
+    }
+
+    $uvToolBinDir = Get-UvToolBinDir
+    if ($uvToolBinDir) {
+      $pathEntries = @($env:Path -split [System.IO.Path]::PathSeparator)
+      if ($pathEntries -notcontains $uvToolBinDir) {
+        $env:Path = "$uvToolBinDir$([System.IO.Path]::PathSeparator)$env:Path"
+      }
     }
     return
   }
@@ -659,6 +958,8 @@ $missingCount = 0
 $unmanagedCount = 0
 $failedVersionCount = 0
 $installAttemptCount = 0
+$installSkippedCount = 0
+$installSkippedTools = @()
 $postInstallUnavailableCount = 0
 $postInstallUnavailableTools = @()
 $postInstallPathRefreshCount = 0
@@ -673,7 +974,11 @@ foreach ($tool in $Tools) {
     $installManager = Get-InstallManager $tool
 
     if ($installManager) {
-      Write-Host ("[missing] {0,-14} package manager: {1}" -f $tool.Name, $installManager)
+      if ($installManager -eq "uv") {
+        Write-Host ("[missing] {0,-14} installer: uv tool install" -f $tool.Name)
+      } else {
+        Write-Host ("[missing] {0,-14} package manager: {1}" -f $tool.Name, $installManager)
+      }
       if ($InstallMissing) {
         $installAttemptCount++
         Install-Tool $installManager $tool
@@ -698,11 +1003,23 @@ foreach ($tool in $Tools) {
     } else {
       $mappedManagers = @(Get-ToolMappedManagers $tool)
       $alternateManagers = @($mappedManagers | Where-Object { $availableManagers -notcontains $_ })
+      $blockedManagers = @(Get-ToolBlockedManagers $tool)
       if ($availableManagers.Count -gt 0 -and $alternateManagers.Count -gt 0) {
         Write-Host ("[missing] {0,-14} package not available via detected manager(s)" -f $tool.Name)
         $differentManagerTools += [pscustomobject]@{
           Name = $tool.Name
           Managers = $alternateManagers
+        }
+      } elseif ($blockedManagers.Count -gt 0) {
+        $blocked = $blockedManagers[0]
+        Write-Host ("[missing] {0,-14} package manager: {1} ({2})" -f $tool.Name, $blocked.Manager, $blocked.Reason)
+        if ($InstallMissing) {
+          $installSkippedCount++
+          $installSkippedTools += [pscustomobject]@{
+            Name = $tool.Name
+            Manager = $blocked.Manager
+            Reason = $blocked.Reason
+          }
         }
       } elseif ($mappedManagers.Count -eq 0) {
         Write-Host ("[missing] {0,-14} package has no supported Windows mapping" -f $tool.Name)
@@ -714,7 +1031,7 @@ foreach ($tool in $Tools) {
   }
 
   $source = Get-ToolSource $cmd.Source $tool
-  $version = Get-VersionLine $cmd
+  $version = Get-VersionLine $cmd $tool
   if ($tool.Name -eq "yarn" -and $version -eq "version check failed" -and $source -eq "npm-or-node") {
     $version = "corepack shim; version is selected per project"
   } elseif ($null -ne $version -and $version.Length -eq 0) {
@@ -761,6 +1078,9 @@ if ($InstallMissing -and $installAttemptCount -gt 0) {
     Write-Host "  Available after PATH refresh in this script: $postInstallPathRefreshCount"
   }
 }
+if ($InstallMissing -and $installSkippedCount -gt 0) {
+  Write-Host "  Install skipped due to unavailable package manager: $installSkippedCount"
+}
 if ($UpgradeManaged) {
   Write-Host "  Unmanaged upgrades skipped: $unmanagedCount"
 }
@@ -777,6 +1097,10 @@ if ($differentManagerTools.Count -gt 0) {
 }
 if ($postInstallUnavailableCount -gt 0) {
   Write-Warning "$postInstallUnavailableCount command(s) are still unavailable after install attempts: $($postInstallUnavailableTools -join ', '). Package manager reported install/upgrade completed or no upgrade was needed; restart the shell or check package/app alias PATH entries."
+}
+if ($installSkippedCount -gt 0) {
+  $skippedDetails = @($installSkippedTools | ForEach-Object { "$($_.Name) ($($_.Manager) $($_.Reason))" })
+  Write-Warning "$installSkippedCount command(s) were not installed because their package manager is unavailable in this shell: $($skippedDetails -join ', ')."
 }
 if ($missingCount -gt 0 -and -not $InstallMissing) {
   Show-InstallHint

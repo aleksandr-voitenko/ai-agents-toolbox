@@ -52,12 +52,20 @@ This conservative stance is the main project invariant.
   when it is available, especially inside CI install-smoke containers, while
   still working anonymously for normal users when rate limits allow it.
 - Treat source detection as best effort and label uncertain cases honestly.
-- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `difftastic` -> `difft`, `typos-cli` -> `typos`, `libmagic` -> `file`, `ImageMagick`/`imagemagick` -> `magick` or `convert`, `libimage-exiftool-perl`/`perl-Image-ExifTool`/`perl-image-exiftool`/`exiftool` -> `exiftool` or `vendor_perl/exiftool`, `vim` -> `xxd`, `bsdextrautils`/`util-linux` -> `hexdump`, `coreutils`/`mscoreutils` -> `stat` and `realpath`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
+- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `difftastic` -> `difft`, `typos-cli` -> `typos`, `libmagic` -> `file`, `ImageMagick`/`imagemagick` -> `magick` or `convert`, `libimage-exiftool-perl`/`perl-Image-ExifTool`/`perl-image-exiftool`/`exiftool` -> `exiftool` or `vendor_perl/exiftool`, `vim` -> `xxd`, `coreutils`/`mscoreutils` -> `stat` and `realpath`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
 - Be careful with Windows: PATH shims and multi-manager ownership can be messy. Prefer reporting uncertainty over making destructive assumptions.
 - Keep Windows package mappings blank when a supported manager does not expose
-  the requested command reliably. `pre-commit` and `hexdump` are currently
-  detection-only on Windows, and `ast-grep` has winget/Scoop mappings but no
+  the requested command reliably. `pre-commit` is the narrow exception: when
+  `uv` and Python are available, Windows installs it with `uv tool install`,
+  and uv-managed commands should report `uv:pre-commit` when uv tool metadata
+  and the command path agree. `ast-grep` has winget/Scoop mappings but no
   verified Chocolatey mapping.
+- Platform-specific tools are allowed. `rsync` is managed on Linux and macOS
+  only, not on Windows. Windows additionally manages `pwsh` through winget's
+  `Microsoft.PowerShell` package; Linux and macOS do not require it.
+- In Windows auto install mode, skip machine-wide Chocolatey when the current
+  shell is not elevated. Explicit `-Manager choco` may still be requested, but
+  should fail before invoking Chocolatey with a clear elevation message.
 
 ## Implementation Guidance
 
@@ -95,6 +103,6 @@ On macOS, also run:
 ./macos.sh
 ```
 
-The GitHub Actions PR workflow runs hosted check-only smoke tests on Ubuntu, macOS, and Windows. The install smoke workflow also runs real install checks with Linux `apt`, `dnf`, `pacman`, and `zypper` containers, macOS Homebrew, and Windows Chocolatey on PRs, pushes, and the preserved nightly schedule while live package-manager failures are being debugged. Windows Chocolatey install smoke allows only the known unsupported Windows mappings (`pre-commit`, `ast-grep`, and `hexdump`) to remain missing.
+The GitHub Actions PR workflow runs hosted check-only smoke tests on Ubuntu, macOS, and Windows. The install smoke workflow also runs real install checks with Linux `apt`, `dnf`, `pacman`, and `zypper` containers, macOS Homebrew, and Windows Chocolatey on PRs, pushes, and the preserved nightly schedule while live package-manager failures are being debugged. Windows Chocolatey install smoke allows only the known unsupported Chocolatey mapping for `ast-grep` to remain missing.
 
 `shellcheck` and PowerShell validation may require extra local tools. If `pwsh` or Windows is not available, say so in the final response and describe what was statically checked.

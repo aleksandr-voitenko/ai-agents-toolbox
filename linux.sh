@@ -95,7 +95,6 @@ zip|zip|zip|zip|zip|zip
 unzip|unzip|unzip|unzip|unzip|unzip
 rsync|rsync|rsync|rsync|rsync|rsync
 xxd|xxd|xxd|xxd|vim|vim
-hexdump|hexdump|bsdextrautils|util-linux|util-linux|util-linux
 stat|stat|coreutils|coreutils|coreutils|coreutils
 realpath|realpath|coreutils|coreutils|coreutils|coreutils
 uv|uv|github-release:uv|uv|uv|github-release:uv
@@ -186,18 +185,72 @@ version_output() {
   extract_version_from_output "$output"
 }
 
-pre_commit_uv_tool_version() {
-  local tool_dir="${UV_TOOL_DIR:-/usr/local/share/uv/tools}"
-  local metadata version
+uv_tool_dir_candidates() {
+  if [ -n "${UV_TOOL_DIR:-}" ]; then
+    printf '%s\n' "$UV_TOOL_DIR"
+  fi
+  if have uv; then
+    uv tool dir 2>/dev/null || true
+  fi
+  printf '%s\n' /usr/local/share/uv/tools
+  if [ -n "${HOME:-}" ]; then
+    printf '%s\n' "$HOME/.local/share/uv/tools"
+  fi
+}
 
-  for metadata in "$tool_dir"/pre-commit/lib/python*/site-packages/pre_commit-*.dist-info/METADATA; do
-    [ -r "$metadata" ] || continue
-    version="$(sed -n 's/^Version:[[:space:]]*//p' "$metadata" | head -n 1)"
-    if [ -n "$version" ]; then
-      printf '%s\n' "$version"
+uv_tool_bin_dir_candidates() {
+  if [ -n "${UV_TOOL_BIN_DIR:-}" ]; then
+    printf '%s\n' "$UV_TOOL_BIN_DIR"
+  fi
+  if have uv; then
+    uv tool dir --bin 2>/dev/null || true
+  fi
+  printf '%s\n' /usr/local/bin
+  if [ -n "${HOME:-}" ]; then
+    printf '%s\n' "$HOME/.local/bin"
+  fi
+}
+
+pre_commit_uv_tool_version() {
+  local tool_dir metadata version
+
+  while IFS= read -r tool_dir; do
+    [ -n "$tool_dir" ] || continue
+    for metadata in "$tool_dir"/pre-commit/lib/python*/site-packages/pre_commit-*.dist-info/METADATA; do
+      [ -r "$metadata" ] || continue
+      version="$(sed -n 's/^Version:[[:space:]]*//p' "$metadata" | head -n 1)"
+      if [ -n "$version" ]; then
+        printf '%s\n' "$version"
+        return 0
+      fi
+    done
+  done < <(uv_tool_dir_candidates)
+
+  return 1
+}
+
+is_pre_commit_uv_tool() {
+  local command_path="$1"
+  local resolved="$command_path"
+  local command_dir uv_bin_dir resolved_uv_bin_dir
+
+  pre_commit_uv_tool_version >/dev/null || return 1
+
+  if have readlink; then
+    resolved="$(readlink -f "$command_path" 2>/dev/null || printf '%s' "$command_path")"
+  fi
+  command_dir="$(dirname "$resolved")"
+
+  while IFS= read -r uv_bin_dir; do
+    [ -n "$uv_bin_dir" ] || continue
+    resolved_uv_bin_dir="$uv_bin_dir"
+    if have readlink; then
+      resolved_uv_bin_dir="$(readlink -f "$uv_bin_dir" 2>/dev/null || printf '%s' "$uv_bin_dir")"
+    fi
+    if [ "$command_dir" = "$resolved_uv_bin_dir" ]; then
       return 0
     fi
-  done
+  done < <(uv_tool_bin_dir_candidates)
 
   return 1
 }
@@ -252,7 +305,7 @@ version_for() {
     pre-commit)
       version_output "$command_name" --version || pre_commit_uv_tool_version
       ;;
-    hexdump|stat|realpath)
+    stat|realpath)
       version_output "$command_name" --version || printf '%s\n' "system utility; no version flag"
       ;;
     *)
@@ -304,6 +357,11 @@ detect_source() {
   local resolved="$command_path"
   if have readlink; then
     resolved="$(readlink -f "$command_path" 2>/dev/null || printf '%s' "$command_path")"
+  fi
+
+  if [ "$(basename "$resolved")" = "pre-commit" ] && is_pre_commit_uv_tool "$resolved"; then
+    printf 'uv:pre-commit'
+    return 0
   fi
 
   if have dpkg; then
@@ -385,6 +443,13 @@ package_version_for_source() {
           printf 'package version: %s' "$version"
           return 0
         fi
+      fi
+      ;;
+    uv:pre-commit)
+      version="$(pre_commit_uv_tool_version || true)"
+      if [ -n "$version" ]; then
+        printf 'package version: pre-commit %s' "$version"
+        return 0
       fi
       ;;
   esac

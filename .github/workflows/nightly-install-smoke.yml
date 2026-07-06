@@ -93,7 +93,7 @@ jobs:
           if ($finalCheck -notmatch '(?m)^\s*Version checks failed:\s+0\s*$') {
             throw "Expected Windows check-only version checks to be 0."
           }
-          $expectedMissing = @("pre-commit", "ast-grep", "hexdump")
+          $expectedMissing = @("ast-grep")
           $missing = [regex]::Matches($finalCheck, '(?m)^\[missing\]\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }
           $unexpectedMissing = @($missing | Where-Object { $expectedMissing -notcontains $_ })
           if ($unexpectedMissing.Count -gt 0) {
@@ -206,7 +206,7 @@ jobs:
           if ($finalCheck -notmatch '(?m)^\s*Version checks failed:\s+0\s*$') {
             throw "Expected Windows check-only version checks to be 0."
           }
-          $expectedMissing = @("pre-commit", "ast-grep", "hexdump")
+          $expectedMissing = @("ast-grep")
           $missing = [regex]::Matches($finalCheck, '(?m)^\[missing\]\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }
           $unexpectedMissing = @($missing | Where-Object { $expectedMissing -notcontains $_ })
           if ($unexpectedMissing.Count -gt 0) {

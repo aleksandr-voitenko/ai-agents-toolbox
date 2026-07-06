@@ -84,7 +84,6 @@ zip|zip|zip
 unzip|unzip|unzip
 rsync|rsync|rsync
 xxd|xxd|vim
-hexdump|hexdump|util-linux
 stat|stat,gstat|coreutils
 realpath|realpath,grealpath|coreutils
 uv|uv|uv
@@ -126,6 +125,68 @@ resolve_path() {
   fi
 }
 
+uv_tool_dir_candidates() {
+  if [ -n "${UV_TOOL_DIR:-}" ]; then
+    printf '%s\n' "$UV_TOOL_DIR"
+  fi
+  if command -v uv >/dev/null 2>&1; then
+    uv tool dir 2>/dev/null || true
+  fi
+  if [ -n "${HOME:-}" ]; then
+    printf '%s\n' "$HOME/.local/share/uv/tools"
+  fi
+}
+
+uv_tool_bin_dir_candidates() {
+  if [ -n "${UV_TOOL_BIN_DIR:-}" ]; then
+    printf '%s\n' "$UV_TOOL_BIN_DIR"
+  fi
+  if command -v uv >/dev/null 2>&1; then
+    uv tool dir --bin 2>/dev/null || true
+  fi
+  if [ -n "${HOME:-}" ]; then
+    printf '%s\n' "$HOME/.local/bin"
+  fi
+}
+
+pre_commit_uv_tool_version() {
+  local tool_dir metadata version
+
+  while IFS= read -r tool_dir; do
+    [ -n "$tool_dir" ] || continue
+    for metadata in "$tool_dir"/pre-commit/lib/python*/site-packages/pre_commit-*.dist-info/METADATA; do
+      [ -r "$metadata" ] || continue
+      version="$(sed -n 's/^Version:[[:space:]]*//p' "$metadata" | head -n 1)"
+      if [ -n "$version" ]; then
+        printf '%s\n' "$version"
+        return 0
+      fi
+    done
+  done < <(uv_tool_dir_candidates)
+
+  return 1
+}
+
+is_pre_commit_uv_tool() {
+  local command_path="$1"
+  local resolved command_dir uv_bin_dir resolved_uv_bin_dir
+
+  pre_commit_uv_tool_version >/dev/null || return 1
+
+  resolved="$(resolve_path "$command_path")"
+  command_dir="$(dirname "$resolved")"
+
+  while IFS= read -r uv_bin_dir; do
+    [ -n "$uv_bin_dir" ] || continue
+    resolved_uv_bin_dir="$(resolve_path "$uv_bin_dir")"
+    if [ "$command_dir" = "$resolved_uv_bin_dir" ]; then
+      return 0
+    fi
+  done < <(uv_tool_bin_dir_candidates)
+
+  return 1
+}
+
 version_for() {
   local command_name="$1"
   case "$command_name" in
@@ -144,7 +205,10 @@ version_for() {
     exiftool)
       version_output "$command_name" -ver
       ;;
-    hexdump|stat|realpath)
+    pre-commit)
+      version_output "$command_name" --version || pre_commit_uv_tool_version
+      ;;
+    stat|realpath)
       version_output "$command_name" --version || printf '%s\n' "system utility; no version flag"
       ;;
     *)
@@ -226,6 +290,11 @@ detect_source() {
   local resolved
   resolved="$(resolve_path "$command_path")"
 
+  if [ "$(basename "$resolved")" = "pre-commit" ] && is_pre_commit_uv_tool "$resolved"; then
+    printf 'uv:pre-commit'
+    return 0
+  fi
+
   if [ -n "$BREW_PREFIX" ]; then
     case "$resolved" in
       "$BREW_PREFIX"/Cellar/*)
@@ -267,6 +336,13 @@ package_version_for_source() {
       version="$(brew list --versions "$package" 2>/dev/null | head -n 1 || true)"
       if [ -n "$version" ]; then
         printf 'package version: %s' "$version"
+        return 0
+      fi
+      ;;
+    uv:pre-commit)
+      version="$(pre_commit_uv_tool_version || true)"
+      if [ -n "$version" ]; then
+        printf 'package version: pre-commit %s' "$version"
         return 0
       fi
       ;;
@@ -372,7 +448,7 @@ while IFS='|' read -r name commands brew_package; do
         fi
       fi
       ;;
-    unknown|cargo|system)
+    unknown|cargo|system|uv:*)
       if [ "$UPGRADE_MANAGED" -eq 1 ]; then
         unmanaged_count=$((unmanaged_count + 1))
         echo "  skip upgrade: existing command is not managed by Homebrew."
