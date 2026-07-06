@@ -1070,8 +1070,10 @@ if ($InstallMissing -and $missingCount -gt 0 -and $availableManagers.Count -eq 0
 
 Write-Host ""
 Write-Host "Summary:"
-Write-Host "  Missing before install: $missingCount"
-Write-Host "  Version checks failed:  $failedVersionCount"
+Write-Host "  Missing packages: $missingCount"
+if ($failedVersionCount -gt 0) {
+  Write-Host "  Version checks failed:  $failedVersionCount"
+}
 if ($InstallMissing -and $installAttemptCount -gt 0) {
   Write-Host "  Still unavailable after install attempts: $postInstallUnavailableCount"
   if ($postInstallPathRefreshCount -gt 0) {

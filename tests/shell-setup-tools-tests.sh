@@ -181,6 +181,17 @@ add_fake_empty_version_tool() {
     'esac'
 }
 
+add_fake_failing_version_tool() {
+  local bin_dir="$1"
+  local command_name="$2"
+  write_executable "$bin_dir/$command_name" \
+    'if [ "$1" = "--version" ] || [ "$1" = "-version" ]; then' \
+    '  printf "probe failed\n" >&2' \
+    '  exit 2' \
+    'fi' \
+    'exit 2'
+}
+
 add_fake_long_version_tool() {
   local bin_dir="$1"
   local command_name="$2"
@@ -466,10 +477,28 @@ test_linux_check_only_does_not_install() {
 
   assert_contains "$output" "Detected package manager: apt" "linux should detect fake apt"
   assert_contains "$output" "[missing] ripgrep" "linux should report missing tools"
+  assert_contains "$output" "Missing packages:" "linux summary should use the missing packages label"
+  assert_not_contains "$output" "Missing before install:" "linux summary should not use the old missing-before-install label"
+  assert_not_contains "$output" "Version checks failed:" "linux summary should omit zero version-check failures"
   assert_contains "$output" "To install missing tools with apt, run:" "linux check-only should print install guidance"
   assert_contains "$output" "./linux.sh --manager apt --install-missing" "linux check-only should print a copy-paste install command"
   assert_not_contains "$output" "Installing " "linux check-only should not print installs"
   assert_log_not_contains "$log" "apt-get install" "linux check-only should not invoke apt-get install"
+}
+
+test_linux_summary_prints_failed_version_count_when_nonzero() {
+  local dir bin output
+  dir="$(new_case_dir linux-version-summary-failed)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_failing_version_tool "$bin" rg
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "[found]   ripgrep" "linux should find fake ripgrep"
+  assert_contains "$output" "version check failed" "linux should report the failed ripgrep version check"
+  assert_contains "$output" "Version checks failed:  1" "linux summary should print nonzero version-check failures"
 }
 
 test_linux_install_missing_uses_selected_managers() {
@@ -666,7 +695,7 @@ test_linux_empty_successful_version_output_is_not_a_failure() {
 
   assert_contains "$output" "[found]   ripgrep" "linux should find fake ripgrep"
   assert_contains "$output" "package version: ripgrep-15.0.0-1.fc44.x86_64" "linux should use package metadata for empty successful version output"
-  assert_contains "$output" "Version checks failed:  0" "linux should not fail successful empty version checks"
+  assert_not_contains "$output" "Version checks failed:" "linux should omit zero successful empty version-check failures from the summary"
   assert_not_contains "$output" "version output empty" "linux should prefer package metadata when it is available"
   assert_not_contains "$output" "version check failed" "linux should not report successful empty version output as failed"
 }
@@ -769,7 +798,7 @@ test_linux_finds_vendor_perl_exiftool() {
   assert_contains "$output" "[found]   exiftool" "linux should find ExifTool in a vendor_perl PATH subdirectory"
   assert_contains "$output" "/bin/vendor_perl/exiftool" "linux should report the vendor_perl ExifTool path suffix"
   assert_contains "$output" "13.59" "linux should run version checks for vendor_perl ExifTool"
-  assert_contains "$output" "Version checks failed:  0" "linux should not fail vendor_perl ExifTool version checks"
+  assert_not_contains "$output" "Version checks failed:" "linux should omit zero vendor_perl ExifTool version-check failures from the summary"
 }
 
 test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure() {
@@ -785,7 +814,7 @@ test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure() {
 
   assert_contains "$output" "[found]   ffmpeg" "linux should find fake FFmpeg"
   assert_contains "$output" "1.0" "linux should report FFmpeg's compact version token"
-  assert_contains "$output" "Version checks failed:  0" "linux should not fail verbose FFmpeg version checks"
+  assert_not_contains "$output" "Version checks failed:" "linux should omit zero verbose FFmpeg version-check failures from the summary"
   assert_not_contains "$output" "version check failed" "linux should not let head/pipefail break verbose FFmpeg checks"
 }
 
@@ -810,7 +839,7 @@ test_linux_uses_uv_tool_metadata_when_pre_commit_version_probe_fails() {
   assert_contains "$output" "[found]   pre-commit" "linux should find fake pre-commit"
   assert_contains "$output" "uv:pre-commit" "linux should report uv ownership for uv-managed pre-commit"
   assert_contains "$output" "4.6.0" "linux should report the uv tool metadata version"
-  assert_contains "$output" "Version checks failed:  0" "linux should not fail uv-managed pre-commit version checks"
+  assert_not_contains "$output" "Version checks failed:" "linux should omit zero uv-managed pre-commit version-check failures from the summary"
   assert_not_contains "$output" "version check failed" "linux should not report uv-managed pre-commit as a failed version check"
 }
 
@@ -861,10 +890,28 @@ test_macos_check_only_does_not_install() {
   FAKE_COMMAND_LOG="$log" FAKE_BREW_PREFIX="$prefix" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
 
   assert_contains "$output" "[missing] ripgrep" "macOS should report missing tools"
+  assert_contains "$output" "Missing packages:" "macOS summary should use the missing packages label"
+  assert_not_contains "$output" "Missing before install:" "macOS summary should not use the old missing-before-install label"
+  assert_not_contains "$output" "Version checks failed:" "macOS summary should omit zero version-check failures"
   assert_contains "$output" "To install missing tools with Homebrew, run:" "macOS check-only should print install guidance"
   assert_contains "$output" "./macos.sh --install-missing" "macOS check-only should print a copy-paste install command"
   assert_not_contains "$output" "Installing " "macOS check-only should not print installs"
   assert_log_not_contains "$log" "brew install" "macOS check-only should not invoke brew install"
+}
+
+test_macos_summary_prints_failed_version_count_when_nonzero() {
+  local dir bin output
+  dir="$(new_case_dir macos-version-summary-failed)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_failing_version_tool "$bin" rg
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
+
+  assert_contains "$output" "[found]   ripgrep" "macOS should find fake ripgrep"
+  assert_contains "$output" "version check failed" "macOS should report the failed ripgrep version check"
+  assert_contains "$output" "Version checks failed:  1" "macOS summary should print nonzero version-check failures"
 }
 
 test_macos_install_missing_uses_brew() {
@@ -922,7 +969,7 @@ test_macos_reports_uv_managed_pre_commit_source() {
   assert_contains "$output" "[found]   pre-commit" "macOS should find fake uv-managed pre-commit"
   assert_contains "$output" "uv:pre-commit" "macOS should report uv ownership for uv-managed pre-commit"
   assert_contains "$output" "4.6.0" "macOS should report the uv tool metadata version"
-  assert_contains "$output" "Version checks failed:  0" "macOS should not fail uv-managed pre-commit version checks"
+  assert_not_contains "$output" "Version checks failed:" "macOS should omit zero uv-managed pre-commit version-check failures from the summary"
   assert_not_contains "$output" "version check failed" "macOS should not report uv-managed pre-commit as a failed version check"
 }
 
@@ -958,7 +1005,7 @@ test_macos_empty_successful_version_output_is_not_a_failure() {
 
   assert_contains "$output" "[found]   ripgrep" "macOS should find fake ripgrep"
   assert_contains "$output" "package version: ripgrep 15.0.0" "macOS should use Homebrew metadata for empty successful version output"
-  assert_contains "$output" "Version checks failed:  0" "macOS should not fail successful empty version checks"
+  assert_not_contains "$output" "Version checks failed:" "macOS should omit zero successful empty version-check failures from the summary"
   assert_not_contains "$output" "version output empty" "macOS should prefer package metadata when it is available"
   assert_not_contains "$output" "version check failed" "macOS should not report successful empty version output as failed"
 }
@@ -1073,6 +1120,7 @@ run_test() {
 }
 
 run_test "linux check-only does not install" test_linux_check_only_does_not_install
+run_test "linux summary prints nonzero version failures" test_linux_summary_prints_failed_version_count_when_nonzero
 run_test "linux install-missing uses selected managers" test_linux_install_missing_uses_selected_managers
 run_test "linux zypper rebuilds metadata after install failure" test_linux_zypper_rebuilds_metadata_after_install_failure
 run_test "linux GitHub release downloads use token" test_linux_github_release_downloads_use_token_when_available
@@ -1087,6 +1135,7 @@ run_test "linux uses uv tool metadata when pre-commit version probe fails" test_
 run_test "linux upgrade-managed uses managed owner only" test_linux_upgrade_managed_uses_owner_only
 run_test "linux install-missing without manager prints guidance" test_linux_install_without_manager_prints_guidance
 run_test "macOS check-only does not install" test_macos_check_only_does_not_install
+run_test "macOS summary prints nonzero version failures" test_macos_summary_prints_failed_version_count_when_nonzero
 run_test "macOS install-missing uses Homebrew" test_macos_install_missing_uses_brew
 run_test "macOS install-missing without Homebrew prints guidance" test_macos_install_without_brew_prints_guidance
 run_test "macOS empty successful version output is not a failure" test_macos_empty_successful_version_output_is_not_a_failure

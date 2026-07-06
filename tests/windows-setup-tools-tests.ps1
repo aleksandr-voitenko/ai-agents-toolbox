@@ -117,6 +117,19 @@ function Add-FakeEmptyVersionTool {
   )
 }
 
+function Add-FakeFailingVersionTool {
+  param(
+    [string]$Directory,
+    [string]$CommandName
+  )
+
+  Write-CmdFile -Path (Join-Path $Directory "$CommandName.cmd") -Lines @(
+    'if /I "%1"=="--version" echo probe failed 1>&2',
+    'if /I "%1"=="--version" exit /b 2',
+    'exit /b 2'
+  )
+}
+
 function Add-FakeLongVersionTool {
   param(
     [string]$Directory,
@@ -416,10 +429,25 @@ try {
 
     Assert-Contains $output "Detected package managers: winget" "Windows should detect fake winget"
     Assert-Contains $output "[missing] ripgrep" "Windows should report missing tools"
+    Assert-Contains $output "Missing packages:" "Windows summary should use the missing packages label"
+    Assert-NotContains $output "Missing before install:" "Windows summary should not use the old missing-before-install label"
+    Assert-NotContains $output "Version checks failed:" "Windows summary should omit zero version-check failures"
     Assert-Contains $output "To install missing tools, run:" "Windows check-only should print install guidance"
     Assert-Contains $output "powershell -ExecutionPolicy Bypass -File .\windows.ps1 -InstallMissing" "Windows check-only should print a copy-paste install command"
     Assert-NotContains $output "Installing " "Windows check-only should not print installs"
     Assert-LogNotContains $ctx.Log " install " "Windows check-only should not invoke installs"
+  }
+
+  Run-Test "Windows summary prints nonzero version failures" {
+    $ctx = New-TestContext "version-summary-failed"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeFailingVersionTool $ctx.Bin "rg"
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
+    Assert-Contains $output "version check failed" "Windows should report the failed ripgrep version check"
+    Assert-Contains $output "Version checks failed:  1" "Windows summary should print nonzero version-check failures"
   }
 
   foreach ($manager in @("winget", "scoop", "choco")) {
@@ -519,7 +547,7 @@ try {
     Assert-Contains $output "[found]   pre-commit" "Windows should find fake uv-managed pre-commit"
     Assert-Contains $output "uv:pre-commit" "Windows should report uv ownership for uv-managed pre-commit"
     Assert-Contains $output "4.6.0" "Windows should use uv tool metadata when the pre-commit version probe fails"
-    Assert-Contains $output "Version checks failed:  0" "Windows should not fail uv-managed pre-commit version checks"
+    Assert-NotContains $output "Version checks failed:" "Windows should omit zero uv-managed pre-commit version-check failures from the summary"
     Assert-NotContains $output "version check failed" "Windows should not report uv-managed pre-commit as a failed version check"
   }
 
@@ -600,7 +628,7 @@ try {
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
     Assert-Contains $output "package version: ripgrep BurntSushi.ripgrep.M..." "Windows should use capped package metadata for empty successful version output"
-    Assert-Contains $output "Version checks failed:  0" "Windows should not fail successful empty version checks"
+    Assert-NotContains $output "Version checks failed:" "Windows should omit zero successful empty version-check failures from the summary"
     Assert-NotContains $output "version output empty" "Windows should prefer package metadata when it is available"
     Assert-NotContains $output "version check failed" "Windows should not report successful empty version output as failed"
   }
@@ -651,7 +679,7 @@ try {
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake multiline ripgrep"
     Assert-Contains $output "1.0" "Windows should report the concise version token"
-    Assert-Contains $output "Version checks failed:  0" "Windows should not fail a successful multiline version command"
+    Assert-NotContains $output "Version checks failed:" "Windows should omit zero successful multiline version-check failures from the summary"
     Assert-NotContains $output "rg 1.0" "Windows should not keep the command-name prefix when a concise token is available"
     Assert-NotContains $output "rg build metadata" "Windows should not report later version output lines"
     Assert-NotContains $output "version check failed" "Windows should not report successful multiline version output as failed"
@@ -675,7 +703,7 @@ try {
     Assert-Contains $output "[found]   git" "Windows should find fake Git"
     Assert-Contains $output "2.50.0.windows.1" "Windows should keep Git for Windows dotted suffixes"
     Assert-NotContains $output "git version 2.50.0.windows.1" "Windows should not keep Git's command-name prefix"
-    Assert-Contains $output "Version checks failed:  0" "Windows should not fail successful verbose banner probes"
+    Assert-NotContains $output "Version checks failed:" "Windows should omit zero successful verbose banner version-check failures from the summary"
   }
 
   Run-Test "Windows aligns versions after long package sources" {
@@ -705,7 +733,7 @@ try {
     Assert-Contains $output "5.45" "Windows should report file's compact version token"
     Assert-NotContains $output "file.exe-5.45" "Windows should not report file's executable path as the version"
     Assert-NotContains $output "magic file from" "Windows should not report file's magic database banner as the version"
-    Assert-Contains $output "Version checks failed:  0" "Windows should not fail file's path-like version output"
+    Assert-NotContains $output "Version checks failed:" "Windows should omit zero file path-like version-check failures from the summary"
   }
 
   Run-Test "Windows prefers package tree over built-in tree fallback" {
@@ -741,7 +769,7 @@ try {
 
     Assert-Contains $output "[found]   pdftotext" "Windows should find fake pdftotext"
     Assert-Contains $output "25.12.0" "Windows should report a concise stderr version token"
-    Assert-Contains $output "Version checks failed:  0" "Windows should not fail a successful stderr version command"
+    Assert-NotContains $output "Version checks failed:" "Windows should omit zero successful stderr version-check failures from the summary"
     Assert-NotContains $output "pdftotext version 25.12.0" "Windows should not keep the stderr banner prefix when a concise token is available"
     Assert-NotContains $output "version check failed" "Windows should not report successful stderr version output as failed"
   }
@@ -754,7 +782,7 @@ try {
 
     Assert-Contains $output "[found]   pdftotext" "Windows should find fake pdftotext"
     Assert-Contains $output "25.12.0" "Windows should report the parseable pdftotext version token"
-    Assert-Contains $output "Version checks failed:  0" "Windows should not fail a pdftotext version banner solely because of the exit code"
+    Assert-NotContains $output "Version checks failed:" "Windows should omit zero pdftotext banner version-check failures from the summary"
     Assert-NotContains $output "version check failed" "Windows should not report parseable pdftotext version output as failed"
   }
 
@@ -786,7 +814,7 @@ try {
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep despite an alias sharing the application name"
     Assert-Contains $output "1.0" "Windows should invoke the discovered executable path instead of the alias-shadowed command name"
-    Assert-Contains $output "Version checks failed:  0" "Windows should not fail when command-name re-resolution is shadowed"
+    Assert-NotContains $output "Version checks failed:" "Windows should omit zero alias-shadowed version-check failures from the summary"
     Assert-NotContains $output "version check failed" "Windows should not report the alias-shadowed path check as failed"
   }
 

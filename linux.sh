@@ -1048,8 +1048,10 @@ fi
 
 echo
 echo "Summary:"
-echo "  Missing before install: $missing_count"
-echo "  Version checks failed:  $failed_version_count"
+echo "  Missing packages: $missing_count"
+if [ "$failed_version_count" -gt 0 ]; then
+  echo "  Version checks failed:  $failed_version_count"
+fi
 if [ "$UPGRADE_MANAGED" -eq 1 ]; then
   echo "  Unmanaged upgrades skipped: $unmanaged_count"
 fi
