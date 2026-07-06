@@ -7,19 +7,13 @@ This is your AI agent on a normal developer machine: ready to help, but still lo
 
 ## Why This Exists
 
-Every agentic coding session is better when the boring tools are already there:
-fast search, JSON and YAML processors, GitHub workflow checks, formatters,
-shell linters, PDF utilities, and the little CLI helpers that turn "one quick
-change" into actual momentum.
+AI coding agents are only as useful as the machine they run on. When basic developer tools are missing — fast search, JSON and YAML processors, GitHub workflow checks, formatters, linters, diff tools, PDF utilities, and everyday shell helpers — a coding session can turn into a setup loop: failed commands, manual installs, improvised workarounds, and lost momentum.
 
-Instead of stopping every few minutes to install one more thing, your agent can
-start from a machine that is actually ready for development.
+The problem is not always obvious. An agent may mention a missing command only in its logs, then continue with a slower, less precise, or more fragile workaround. Unless the user reads those logs carefully, the session can look like it is progressing while the agent is quietly working with fewer capabilities than expected.
 
-This toolbox gives any AI agent (or a developer) a quick, conservative way to check
-a machine and optionally install the missing essentials through a package manager
-they already use. Try it when a fresh laptop, container, or borrowed workstation
-needs to feel ready for real AI-assisted development instead of another setup
-scavenger hunt.
+AI Agents Toolbox gives agents and developers a conservative baseline. It checks which essential tools are already available, reports what is missing, and, when you opt in, installs the gaps through the package manager already present on the machine.
+
+Use it before handing an agent a fresh laptop, container, or borrowed workstation. The goal is not to replace your dotfiles, force a custom stack, or install a package manager for you. It is to make the environment ready enough that the agent can start doing real development work immediately.
 
 ## Tools Managed
 
