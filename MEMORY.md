@@ -43,8 +43,8 @@ This conservative stance is the main project invariant.
   default repositories have no native package, missing `uv` on apt or zypper,
   missing `pre-commit` on zypper, and missing `ast-grep` on apt, dnf, or
   zypper. The script downloads the official GitHub release, verifies a checksum
-  or release-asset digest when `sha256sum` is available, and installs it to
-  `/usr/local/bin` without taking over future managed upgrades. GitHub API
+  or release-asset digest when `sha256sum` is available, and exposes the command
+  from `/usr/local/bin` without taking over future managed upgrades. GitHub API
   requests should use `GITHUB_TOKEN`
   when it is available, especially inside CI install-smoke containers, while
   still working anonymously for normal users when rate limits allow it.

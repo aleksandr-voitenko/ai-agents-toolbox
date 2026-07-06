@@ -767,7 +767,7 @@ install_ast_grep_release() {
 }
 
 install_pre_commit_release() {
-  local api_url asset_name asset_url asset_digest tmp_dir status
+  local api_url asset_name asset_url asset_digest wrapper_path tmp_dir status
 
   api_url="https://api.github.com/repos/pre-commit/pre-commit/releases/latest"
   tmp_dir="$(mktemp -d)"
@@ -797,7 +797,25 @@ install_pre_commit_release() {
       echo "sha256sum was not found; skipping pre-commit checksum verification." >&2
     fi
 
-    run_elevated install -m 0755 "$asset_name" /usr/local/bin/pre-commit
+    run_elevated install -d -m 0755 /usr/local/libexec
+    run_elevated install -m 0644 "$asset_name" /usr/local/libexec/pre-commit.pyz
+
+    # The zipapp hardcodes ~/.cache/pre-commit-zipapp before it runs pre-commit.
+    # Minimal containers can have unusual HOME values, so prove that exact cache
+    # path is usable before falling back to a temporary home.
+    wrapper_path="$tmp_dir/pre-commit-wrapper"
+    {
+      printf '%s\n' '#!/bin/sh'
+      printf '%s\n' "if [ -n \"\${HOME:-}\" ] && mkdir -p \"\$HOME/.cache/pre-commit-zipapp\" 2>/dev/null; then"
+      printf '%s\n' '  :'
+      printf '%s\n' 'else'
+      printf '%s\n' "  HOME=\"\${TMPDIR:-/tmp}/pre-commit-home\""
+      printf '%s\n' '  export HOME'
+      printf '%s\n' "  mkdir -p \"\$HOME/.cache/pre-commit-zipapp\" || exit 1"
+      printf '%s\n' 'fi'
+      printf '%s\n' 'exec python3 /usr/local/libexec/pre-commit.pyz "$@"'
+    } > "$wrapper_path"
+    run_elevated install -m 0755 "$wrapper_path" /usr/local/bin/pre-commit
   ) || status=$?
 
   rm -rf "$tmp_dir"

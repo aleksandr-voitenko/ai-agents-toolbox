@@ -439,7 +439,7 @@ test_linux_check_only_does_not_install() {
 test_linux_install_missing_uses_selected_managers() {
   local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos
   local expected_just expected_difftastic expected_pandoc expected_imagemagick expected_ffmpeg expected_exiftool last_expected
-  local expected_uv expected_pre_commit expected_ast_grep expected_zip expected_rsync expected_xxd expected_hexdump expected_stat uv_release_dir
+  local expected_uv expected_pre_commit expected_pre_commit_wrapper expected_ast_grep expected_zip expected_rsync expected_xxd expected_hexdump expected_stat uv_release_dir
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -467,6 +467,7 @@ test_linux_install_missing_uses_selected_managers() {
         ;;
     esac
 
+    expected_pre_commit_wrapper=""
     case "$manager" in
       apt)
         expected="apt-get install -y ripgrep"
@@ -551,7 +552,8 @@ test_linux_install_missing_uses_selected_managers() {
         expected_ffmpeg="zypper install -y ffmpeg-8"
         expected_exiftool="zypper install -y exiftool"
         expected_uv="install -m 0755 $uv_release_dir/uv /usr/local/bin/uv"
-        expected_pre_commit="install -m 0755 pre-commit-4.6.0.pyz /usr/local/bin/pre-commit"
+        expected_pre_commit="install -m 0644 pre-commit-4.6.0.pyz /usr/local/libexec/pre-commit.pyz"
+        expected_pre_commit_wrapper="pre-commit-wrapper /usr/local/bin/pre-commit"
         expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
         expected_zip="zypper install -y zip"
         expected_rsync="zypper install -y rsync"
@@ -575,6 +577,9 @@ test_linux_install_missing_uses_selected_managers() {
     assert_log_contains "$log" "$expected_exiftool" "linux install should map exiftool for $manager"
     assert_log_contains "$log" "$expected_uv" "linux install should map uv for $manager"
     assert_log_contains "$log" "$expected_pre_commit" "linux install should map pre-commit for $manager"
+    if [ -n "$expected_pre_commit_wrapper" ]; then
+      assert_log_contains "$log" "$expected_pre_commit_wrapper" "linux install should install pre-commit wrapper for $manager"
+    fi
     assert_log_contains "$log" "$expected_ast_grep" "linux install should map ast-grep for $manager"
     assert_log_contains "$log" "$expected_zip" "linux install should map zip for $manager"
     assert_log_contains "$log" "$expected_rsync" "linux install should map rsync for $manager"
