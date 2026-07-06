@@ -312,9 +312,9 @@ The install smoke workflow also runs the opt-in install path on disposable
 Linux distro containers, macOS with Homebrew, and Windows with Chocolatey. The
 Windows Chocolatey smoke permits only the known unsupported Chocolatey mapping
 for `ast-grep` to remain missing. It is enabled for pull requests, pushes, and
-its nightly schedule, but the scheduled run omits the live `zypper` container
-because Tumbleweed package retrieval is too unstable for unattended nightly
-checks. Pull requests and pushes still exercise `zypper` install smoke.
+its nightly schedule, but omits the live `zypper` container because Tumbleweed
+package retrieval is too unstable for unattended checks. Hermetic fake-manager
+tests still exercise `zypper` behavior without depending on live repositories.
 
 Run the hermetic tests locally with:
 
