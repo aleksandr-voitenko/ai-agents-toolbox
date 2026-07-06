@@ -83,8 +83,9 @@ Some requested tools are supplied by default operating-system utilities on many
 machines. For example, macOS normally provides `tar`, `zip`, `unzip`, `rsync`,
 `xxd`, `hexdump`, `stat`, and `realpath`; Homebrew fallback packages may expose
 GNU-prefixed command names such as `gtar`, `gstat`, and `grealpath`. Linux
-fallbacks install upstream `uv` and `ast-grep` release assets only where default
-distribution repositories do not provide native packages. On Windows,
+fallbacks install upstream `uv`, `pre-commit`, and `ast-grep` release assets
+only where default distribution repositories do not provide native packages. On
+Windows,
 `pre-commit` and `hexdump` are detected when already available on `PATH`, but
 they currently have no verified package mapping through winget, Scoop, or
 Chocolatey.

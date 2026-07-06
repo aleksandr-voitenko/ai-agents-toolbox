@@ -99,7 +99,7 @@ hexdump|hexdump|bsdextrautils|util-linux|util-linux|util-linux
 stat|stat|coreutils|coreutils|coreutils|coreutils
 realpath|realpath|coreutils|coreutils|coreutils|coreutils
 uv|uv|github-release:uv|uv|uv|github-release:uv
-pre-commit|pre-commit|pre-commit|pre-commit|pre-commit|pre-commit
+pre-commit|pre-commit|pre-commit|pre-commit|pre-commit|github-release:pre-commit
 ast-grep|ast-grep|github-release:ast-grep|github-release:ast-grep|ast-grep|github-release:ast-grep
 ghostscript|gs|ghostscript|ghostscript|ghostscript|ghostscript
 pdftotext|pdftotext|poppler-utils|poppler-utils|poppler|poppler-tools
@@ -766,6 +766,44 @@ install_ast_grep_release() {
   return "$status"
 }
 
+install_pre_commit_release() {
+  local api_url asset_name asset_url asset_digest tmp_dir status
+
+  api_url="https://api.github.com/repos/pre-commit/pre-commit/releases/latest"
+  tmp_dir="$(mktemp -d)"
+  status=0
+
+  (
+    set -e
+    cd "$tmp_dir"
+    download_to_stdout "$api_url" > release.json
+    asset_url="$(sed -n 's#.*"browser_download_url":[[:space:]]*"\([^"]*/pre-commit-[^"/]*\.pyz\)".*#\1#p' release.json | head -n 1)"
+    if [ -z "$asset_url" ]; then
+      echo "Could not find a pre-commit pyz release asset." >&2
+      exit 1
+    fi
+
+    asset_name="${asset_url##*/}"
+    asset_digest="$(sed -n "/\"name\":[[:space:]]*\"$asset_name\"/,/\"browser_download_url\"/s#.*\"digest\":[[:space:]]*\"sha256:\\([a-f0-9]*\\)\".*#\\1#p" release.json | head -n 1)"
+    download_to_stdout "$asset_url" > "$asset_name"
+
+    if have sha256sum; then
+      if [ -z "$asset_digest" ]; then
+        echo "Could not find a GitHub SHA256 digest for $asset_name." >&2
+        exit 1
+      fi
+      printf '%s  %s\n' "$asset_digest" "$asset_name" | sha256sum -c -
+    else
+      echo "sha256sum was not found; skipping pre-commit checksum verification." >&2
+    fi
+
+    run_elevated install -m 0755 "$asset_name" /usr/local/bin/pre-commit
+  ) || status=$?
+
+  rm -rf "$tmp_dir"
+  return "$status"
+}
+
 install_github_release_tool() {
   local package="$1"
   case "$package" in
@@ -780,6 +818,9 @@ install_github_release_tool() {
       ;;
     github-release:uv)
       install_uv_release
+      ;;
+    github-release:pre-commit)
+      install_pre_commit_release
       ;;
     github-release:ast-grep)
       install_ast_grep_release

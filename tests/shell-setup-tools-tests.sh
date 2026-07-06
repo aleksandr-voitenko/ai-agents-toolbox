@@ -322,6 +322,11 @@ add_fake_github_release_installers() {
     '    printf "%s\n" "{\"name\":\"uv-i686-unknown-linux-gnu.tar.gz.sha256\"}"' \
     '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/astral-sh/uv/releases/download/0.11.26/uv-i686-unknown-linux-gnu.tar.gz.sha256\"}"' \
     '    ;;' \
+    '  *api.github.com/repos/pre-commit/pre-commit/releases/latest*)' \
+    '    printf "%s\n" "{\"name\":\"pre-commit-4.6.0.pyz\"}"' \
+    '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/pre-commit/pre-commit/releases/download/v4.6.0/pre-commit-4.6.0.pyz\"}"' \
+    '    ;;' \
     '  *api.github.com/repos/ast-grep/ast-grep/releases/latest*)' \
     '    printf "%s\n" "{\"name\":\"app-x86_64-unknown-linux-gnu.zip\"}"' \
     '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
@@ -546,7 +551,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_ffmpeg="zypper install -y ffmpeg-8"
         expected_exiftool="zypper install -y exiftool"
         expected_uv="install -m 0755 $uv_release_dir/uv /usr/local/bin/uv"
-        expected_pre_commit="zypper install -y pre-commit"
+        expected_pre_commit="install -m 0755 pre-commit-4.6.0.pyz /usr/local/bin/pre-commit"
         expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
         expected_zip="zypper install -y zip"
         expected_rsync="zypper install -y rsync"

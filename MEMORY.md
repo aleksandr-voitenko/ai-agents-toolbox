@@ -41,10 +41,11 @@ This conservative stance is the main project invariant.
   exceptions are missing `actionlint` and `typos` when apt, dnf, or zypper has
   no verified native package, missing `difftastic` on apt where Ubuntu's
   default repositories have no native package, missing `uv` on apt or zypper,
-  and missing `ast-grep` on apt, dnf, or zypper. The script downloads the
-  official GitHub release, verifies a checksum or release-asset digest when
-  `sha256sum` is available, and installs it to `/usr/local/bin` without taking
-  over future managed upgrades. GitHub API requests should use `GITHUB_TOKEN`
+  missing `pre-commit` on zypper, and missing `ast-grep` on apt, dnf, or
+  zypper. The script downloads the official GitHub release, verifies a checksum
+  or release-asset digest when `sha256sum` is available, and installs it to
+  `/usr/local/bin` without taking over future managed upgrades. GitHub API
+  requests should use `GITHUB_TOKEN`
   when it is available, especially inside CI install-smoke containers, while
   still working anonymously for normal users when rate limits allow it.
 - Treat source detection as best effort and label uncertain cases honestly.
