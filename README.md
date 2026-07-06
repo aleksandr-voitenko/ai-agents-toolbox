@@ -17,54 +17,79 @@ Use it before handing an agent a fresh laptop, container, or borrowed workstatio
 
 ## Tools Managed
 
-The scripts manage these logical tools across supported platforms:
+The scripts manage these logical tools, grouped by the main workflow they
+support:
 
-| Tool | Description |
-| --- | --- |
-| `ripgrep` (`rg`) | Fast recursive text searcher with Git-aware defaults. |
-| `fd` | Fast filesystem search alternative to find. |
-| `jq` | Command-line JSON processor for querying and transforming structured data. |
-| `curl` | URL client for HTTP requests, downloads, and install bootstrapping. |
-| `sqlite3` | Command-line shell for inspecting and managing SQLite databases. |
-| `yq` | Command-line YAML, JSON, XML, TOML, and properties processor. |
-| `actionlint` | Static checker for GitHub Actions workflow files. |
-| `typos` | Source-code-aware spell checker for code, docs, and config files. |
-| `clang-format` | Source formatter for C, C++, Objective-C, Java, JavaScript, and related languages. |
-| `gh` | GitHub CLI for repository, pull request, issue, and workflow operations. |
-| `git` | Distributed version control CLI. |
-| `git-delta` (`delta`) | Syntax-highlighting pager for Git and diff output. |
-| `just` | Command runner for project-local recipes and repeatable tasks. |
-| `difftastic` (`difft`) | Syntax-aware structural diff tool. |
-| `node` | JavaScript runtime for local tooling and application scripts. |
-| `yarn` | JavaScript package manager and project script runner. |
-| `python` | Python runtime for scripts, tests, and developer utilities. |
-| `cmake` | Cross-platform build system generator. |
-| `ninja` | Small, fast build executor commonly used with CMake. |
-| `bat` | Syntax-highlighting file viewer and cat replacement. |
-| `eza` | Modern directory listing tool and ls replacement. |
-| `fzf` | Interactive fuzzy finder for shells and scripts. |
-| `tree` | Recursive directory tree viewer. |
-| `file` | File type detector based on content signatures. |
-| `pandoc` | Universal document converter for markup and publishing workflows. |
-| `imagemagick` (`magick`/`convert`) | Image inspection and conversion toolkit. |
-| `ffmpeg` | Audio and video recording, conversion, and inspection toolkit. |
-| `exiftool` | Metadata reader and writer for images, media, and documents. |
-| `hyperfine` | Command-line benchmarking tool. |
-| `shellcheck` | Static analyzer for shell scripts. |
-| `shfmt` | Formatter for shell scripts. |
-| `tar` | Tape archive utility for creating and extracting `.tar` archives. |
-| `zip` | ZIP archive creation utility. |
-| `unzip` | ZIP archive extraction utility. |
-| `rsync` | Incremental file synchronization and copy utility. Not managed on Windows. |
-| `xxd` | Hex dump and reverse-hex-dump utility. |
-| `stat` | Filesystem metadata inspection utility. |
-| `realpath` | Canonical path resolution utility. |
-| `uv` | Fast Python package, project, and tool manager. |
-| `pwsh` | PowerShell 7 command shell, managed on Windows only. |
-| `pre-commit` | Framework for managing and running repository pre-commit hooks. |
-| `ast-grep` | AST-aware code search, linting, and rewrite tool. |
-| `ghostscript` (`gs`) | PostScript and PDF interpreter used by document workflows. |
-| `pdftotext` | PDF text extraction tool from Poppler. |
+### Search and navigation
+
+- `ast-grep` - AST-aware code search, linting, and rewrite tool.
+- `fd` - Fast filesystem search alternative to `find`.
+- `fzf` - Interactive fuzzy finder for shells and scripts.
+- `ripgrep` (`rg`) - Fast recursive text searcher with Git-aware defaults.
+- `tree` - Recursive directory tree viewer.
+
+### Structured data and files
+
+- `file` - File type detector based on content signatures.
+- `jq` - Command-line JSON processor for querying and transforming structured data.
+- `sqlite3` - Command-line shell for inspecting and managing SQLite databases.
+- `yq` - Command-line YAML, JSON, XML, TOML, and properties processor.
+
+### Git and GitHub workflows
+
+- `gh` - GitHub CLI for repository, pull request, issue, and workflow operations.
+- `git` - Distributed version control CLI.
+
+### Diffing and code review
+
+- `difftastic` (`difft`) - Syntax-aware structural diff tool for reviewing code changes.
+- `git-delta` (`delta`) - Syntax-highlighting pager for Git and diff output.
+
+### Formatting, linting, and validation
+
+- `actionlint` - Static checker for GitHub Actions workflow files.
+- `clang-format` - Source formatter for C, C++, Objective-C, Java, JavaScript, and related languages.
+- `pre-commit` - Framework for managing and running repository pre-commit hooks.
+- `shellcheck` - Static analyzer for shell scripts.
+- `shfmt` - Formatter for shell scripts.
+- `typos` - Source-code-aware spell checker for code, docs, and config files.
+
+### Runtimes, build tools, and package managers
+
+- `cmake` - Cross-platform build system generator.
+- `just` - Command runner for project-local recipes and repeatable tasks.
+- `ninja` - Small, fast build executor commonly used with CMake.
+- `node` - JavaScript runtime for local tooling and application scripts.
+- `python` - Python runtime for scripts, tests, and developer utilities.
+- `uv` - Fast Python package, project, and tool manager.
+- `yarn` - JavaScript package manager and project script runner.
+
+### Documents, media, and conversion
+
+- `exiftool` - Metadata reader and writer for images, media, and documents.
+- `ffmpeg` - Audio and video recording, conversion, and inspection toolkit.
+- `ghostscript` (`gs`) - PostScript and PDF interpreter used by document workflows.
+- `imagemagick` (`magick`/`convert`) - Image inspection and conversion toolkit.
+- `pandoc` - Universal document converter for markup and publishing workflows.
+- `pdftotext` - PDF text extraction tool from Poppler.
+
+### Shell, archive, and system utilities
+
+- `bat` - Syntax-highlighting file viewer and `cat` replacement.
+- `curl` - URL client for HTTP requests, downloads, and install bootstrapping.
+- `eza` - Modern directory listing tool and `ls` replacement.
+- `hyperfine` - Command-line benchmarking tool.
+- `realpath` - Canonical path resolution utility.
+- `rsync` - Incremental file synchronization and copy utility. Not managed on Windows.
+- `stat` - Filesystem metadata inspection utility.
+- `tar` - Tape archive utility for creating and extracting `.tar` archives.
+- `unzip` - ZIP archive extraction utility.
+- `xxd` - Hex dump and reverse-hex-dump utility.
+- `zip` - ZIP archive creation utility.
+
+### Windows-specific
+
+- `pwsh` - PowerShell 7 command shell, managed on Windows only.
 
 Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
