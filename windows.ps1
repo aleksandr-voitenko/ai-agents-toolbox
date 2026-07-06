@@ -307,6 +307,15 @@ function Get-VersionLine {
     }
     if ($exitCode -ne 0) {
       $baseName = [System.IO.Path]::GetFileNameWithoutExtension($commandName)
+      if ($baseName -eq "pdftotext") {
+        # Some bundled Windows Poppler builds can print a usable version banner
+        # while returning a nonzero status. Keep this exception scoped to
+        # pdftotext so other failing native probes remain visible.
+        $versionFromOutput = Get-VersionFromOutput $output
+        if ($versionFromOutput) {
+          return $versionFromOutput
+        }
+      }
       if ($baseName -eq "hexdump" -or $baseName -eq "stat" -or $baseName -eq "realpath") {
         return "system utility; no version flag"
       }

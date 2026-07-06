@@ -198,6 +198,16 @@ function Add-FakePdftotextStderrVersionTool {
   )
 }
 
+function Add-FakePdftotextNonzeroStderrVersionTool {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "pdftotext.cmd") -Lines @(
+    'if /I not "%1"=="-v" exit /b 2',
+    'echo pdftotext version 25.12.0 1>&2',
+    'exit /b 1'
+  )
+}
+
 function Add-FakePythonWindowsAppsAlias {
   param([string]$Root)
 
@@ -632,6 +642,18 @@ try {
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail a successful stderr version command"
     Assert-NotContains $output "pdftotext version 25.12.0" "Windows should not keep the stderr banner prefix when a concise token is available"
     Assert-NotContains $output "version check failed" "Windows should not report successful stderr version output as failed"
+  }
+
+  Run-Test "Windows pdftotext version banner survives nonzero exit" {
+    $ctx = New-TestContext "pdftotext-nonzero-stderr-version"
+    Add-FakePdftotextNonzeroStderrVersionTool $ctx.Bin
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   pdftotext" "Windows should find fake pdftotext"
+    Assert-Contains $output "25.12.0" "Windows should report the parseable pdftotext version token"
+    Assert-Contains $output "Version checks failed:  0" "Windows should not fail a pdftotext version banner solely because of the exit code"
+    Assert-NotContains $output "version check failed" "Windows should not report parseable pdftotext version output as failed"
   }
 
   Run-Test "Windows ignores unusable Python WindowsApps alias" {

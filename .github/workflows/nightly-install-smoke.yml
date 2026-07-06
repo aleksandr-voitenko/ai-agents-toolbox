@@ -72,11 +72,22 @@ jobs:
           $scriptPath = Join-Path $env:TEMP "ai-agents-toolbox-windows.ps1"
           Invoke-WebRequest -UseBasicParsing $scriptUrl -OutFile $scriptPath
           $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-          & $powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -InstallMissing -Manager choco
-          & $powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -CheckOnly | Tee-Object -FilePath "$env:TEMP\setup-tools-url-check.log"
-          Select-String -Path "$env:TEMP\setup-tools-url-check.log" -SimpleMatch "Version checks failed:  0"
+          $checkLog = Join-Path $env:TEMP "setup-tools-url-check.log"
+          $scriptPathLiteral = $scriptPath.Replace("'", "''")
+          $checkLogLiteral = $checkLog.Replace("'", "''")
+          $childCommand = @"
+          & '$scriptPathLiteral' -InstallMissing -Manager choco
+          & '$scriptPathLiteral' -CheckOnly | Tee-Object -FilePath '$checkLogLiteral'
+          "@
+          & $powershell -NoProfile -ExecutionPolicy Bypass -Command $childCommand
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          if (-not (Select-String -Path $checkLog -SimpleMatch "Version checks failed:  0" -Quiet)) {
+            throw "Expected Windows check-only version checks to be 0."
+          }
           $expectedMissing = @("pre-commit", "ast-grep", "hexdump")
-          $missing = Select-String -Path "$env:TEMP\setup-tools-url-check.log" -Pattern '^\[missing\]\s+(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $missing = Select-String -Path $checkLog -Pattern '^\[missing\]\s+(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
           $unexpectedMissing = @($missing | Where-Object { $expectedMissing -notcontains $_ })
           if ($unexpectedMissing.Count -gt 0) {
             throw "Unexpected missing Windows tool(s) after Chocolatey install: $($unexpectedMissing -join ', ')"
@@ -166,11 +177,23 @@ jobs:
         run: |
           choco feature disable --name=showDownloadProgress
           $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-          & $powershell -NoProfile -ExecutionPolicy Bypass -File .\windows.ps1 -InstallMissing -Manager choco
-          & $powershell -NoProfile -ExecutionPolicy Bypass -File .\windows.ps1 -CheckOnly | Tee-Object -FilePath "$env:TEMP\setup-tools-check.log"
-          Select-String -Path "$env:TEMP\setup-tools-check.log" -SimpleMatch "Version checks failed:  0"
+          $checkLog = Join-Path $env:TEMP "setup-tools-check.log"
+          $scriptPath = (Resolve-Path .\windows.ps1).Path
+          $scriptPathLiteral = $scriptPath.Replace("'", "''")
+          $checkLogLiteral = $checkLog.Replace("'", "''")
+          $childCommand = @"
+          & '$scriptPathLiteral' -InstallMissing -Manager choco
+          & '$scriptPathLiteral' -CheckOnly | Tee-Object -FilePath '$checkLogLiteral'
+          "@
+          & $powershell -NoProfile -ExecutionPolicy Bypass -Command $childCommand
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          if (-not (Select-String -Path $checkLog -SimpleMatch "Version checks failed:  0" -Quiet)) {
+            throw "Expected Windows check-only version checks to be 0."
+          }
           $expectedMissing = @("pre-commit", "ast-grep", "hexdump")
-          $missing = Select-String -Path "$env:TEMP\setup-tools-check.log" -Pattern '^\[missing\]\s+(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $missing = Select-String -Path $checkLog -Pattern '^\[missing\]\s+(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
           $unexpectedMissing = @($missing | Where-Object { $expectedMissing -notcontains $_ })
           if ($unexpectedMissing.Count -gt 0) {
             throw "Unexpected missing Windows tool(s) after Chocolatey install: $($unexpectedMissing -join ', ')"
