@@ -108,21 +108,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        event_name:
+          - ${{ github.event_name }}
+        manager:
+          - apt
+          - dnf
+          - pacman
+          - zypper
         include:
-          - image: ubuntu:24.04
-            manager: apt
+          - manager: apt
+            image: ubuntu:24.04
             prepare: apt-get update
-          - image: fedora:latest
-            manager: dnf
+          - manager: dnf
+            image: fedora:latest
             prepare: dnf -y makecache
-          - image: archlinux:latest
-            manager: pacman
+          - manager: pacman
+            image: archlinux:latest
             prepare: pacman -Sy --noconfirm
-          - image: opensuse/tumbleweed:latest
-            manager: zypper
+          - manager: zypper
+            image: opensuse/tumbleweed:latest
             # Avoid a full refresh: Tumbleweed appstream metadata is large and
             # flaky on hosted runners, while install still builds package cache.
             prepare: zypper modifyrepo --no-refresh --all
+        exclude:
+          # Tumbleweed package retrieval is too unstable for unattended
+          # scheduled runs, but zypper still runs in PR/push install smoke.
+          - event_name: schedule
+            manager: zypper
     steps:
       - uses: actions/checkout@v4
 
