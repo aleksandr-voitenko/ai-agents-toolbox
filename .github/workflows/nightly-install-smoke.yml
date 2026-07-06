@@ -23,8 +23,8 @@ jobs:
           set -euo pipefail
           curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh | bash -s -- --install-missing
           curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh | bash -s -- --check-only | tee /tmp/setup-tools-url-check.log
-          grep -q "Missing before install: 0" /tmp/setup-tools-url-check.log
-          grep -q "Version checks failed:  0" /tmp/setup-tools-url-check.log
+          grep -q "Missing packages: 0" /tmp/setup-tools-url-check.log
+          ! grep -q "Version checks failed:" /tmp/setup-tools-url-check.log
 
   linux-url-bootstrap-smoke:
     name: Linux URL bootstrap smoke (${{ matrix.downloader }})
@@ -55,8 +55,8 @@ jobs:
               wget -qO- https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --install-missing
               wget -qO- https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --check-only | tee /tmp/setup-tools-url-check.log
             fi
-            grep -q "Missing before install: 0" /tmp/setup-tools-url-check.log
-            grep -q "Version checks failed:  0" /tmp/setup-tools-url-check.log
+            grep -q "Missing packages: 0" /tmp/setup-tools-url-check.log
+            ! grep -q "Version checks failed:" /tmp/setup-tools-url-check.log
           '
 
   windows-url-bootstrap-smoke:
@@ -90,8 +90,8 @@ jobs:
           if ($checkSections.Count -gt 1) {
             $finalCheck = "Checking developer tools for Windows...$finalCheck"
           }
-          if ($finalCheck -notmatch '(?m)^\s*Version checks failed:\s+0\s*$') {
-            throw "Expected Windows check-only version checks to be 0."
+          if ($finalCheck -match '(?m)^\s*Version checks failed:') {
+            throw "Expected Windows check-only to omit zero version-check failures."
           }
           $expectedMissing = @("ast-grep")
           $missing = [regex]::Matches($finalCheck, '(?m)^\[missing\]\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }
@@ -152,8 +152,8 @@ jobs:
               retry ${{ matrix.prepare }}
               ./linux.sh --install-missing --manager "${{ matrix.manager }}"
               ./linux.sh --check-only | tee /tmp/setup-tools-check.log
-              grep -q "Missing before install: 0" /tmp/setup-tools-check.log
-              grep -q "Version checks failed:  0" /tmp/setup-tools-check.log
+              grep -q "Missing packages: 0" /tmp/setup-tools-check.log
+              ! grep -q "Version checks failed:" /tmp/setup-tools-check.log
             '
 
   macos-install-smoke:
@@ -170,8 +170,8 @@ jobs:
           set -euo pipefail
           ./macos.sh --install-missing
           ./macos.sh --check-only | tee /tmp/setup-tools-check.log
-          grep -q "Missing before install: 0" /tmp/setup-tools-check.log
-          grep -q "Version checks failed:  0" /tmp/setup-tools-check.log
+          grep -q "Missing packages: 0" /tmp/setup-tools-check.log
+          ! grep -q "Version checks failed:" /tmp/setup-tools-check.log
 
   windows-install-smoke:
     name: Windows install smoke
@@ -203,8 +203,8 @@ jobs:
           if ($checkSections.Count -gt 1) {
             $finalCheck = "Checking developer tools for Windows...$finalCheck"
           }
-          if ($finalCheck -notmatch '(?m)^\s*Version checks failed:\s+0\s*$') {
-            throw "Expected Windows check-only version checks to be 0."
+          if ($finalCheck -match '(?m)^\s*Version checks failed:') {
+            throw "Expected Windows check-only to omit zero version-check failures."
           }
           $expectedMissing = @("ast-grep")
           $missing = [regex]::Matches($finalCheck, '(?m)^\[missing\]\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }
