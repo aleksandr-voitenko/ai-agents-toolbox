@@ -431,15 +431,26 @@ try {
   Run-Test "Windows formats display paths" {
     $ctx = New-TestContext "display-paths"
     $longDir = Join-Path $ctx.Root "path-segment-that-should-disappear\versions\v1\bin"
-    New-Item -ItemType Directory -Force -Path $longDir | Out-Null
+    $homeRoot = Join-Path $ctx.Root "home"
+    $longHomeDir = Join-Path $homeRoot "AppData\Local\Programs\tool-package-segment-that-is-too-long-for-boundary\bin"
+    New-Item -ItemType Directory -Force -Path $longDir, $longHomeDir | Out-Null
     Add-FakeManager $ctx.Bin "winget"
     Add-FakeTool $longDir "rg"
+    Add-FakeTool $longHomeDir "sqlite3"
 
-    $output = Invoke-Setup $ctx @{ CheckOnly = $true } @($longDir)
+    $oldUserProfile = $env:USERPROFILE
+    try {
+      $env:USERPROFILE = $homeRoot
+      $output = Invoke-Setup $ctx @{ CheckOnly = $true } @($longDir, $longHomeDir)
+    } finally {
+      $env:USERPROFILE = $oldUserProfile
+    }
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
     Assert-Contains $output "...\versions\v1\bin\rg.cmd" "Windows should preserve the useful tail when shortening long paths"
     Assert-NotContains $output "path-segment-that-should-disappear" "Windows should omit the middle of overlong display paths"
+    Assert-Contains $output "for-boundary\bin\sqlite3.cmd" "Windows should use available path column space when segment-boundary shortening would hide too much"
+    Assert-NotContains $output "~\AppData\Lo...\bin\sqlite3.cmd" "Windows should not collapse long home paths to a sparse executable-only tail"
   }
 
   Run-Test "Windows multiline version output uses first line without failing" {
