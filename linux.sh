@@ -169,10 +169,34 @@ find_command() {
   return 1
 }
 
-first_output_line() {
+version_output() {
   local output
   output="$("$@" 2>&1)" || return 1
-  printf '%s\n' "${output%%$'\n'*}"
+  extract_version_from_output "$output"
+}
+
+extract_version_from_output() {
+  local output="$1"
+  local line fallback
+  # Keep attached prefixes and suffixes like jq-1.7.1-apple or v1.2.3-main,
+  # but discard surrounding banner text, URLs, dates, and build metadata.
+  local version_pattern='(^|[^[:alnum:]_.-])(([[:alpha:]_]+-)?v?[0-9]+([.][0-9]+)+([-+][[:alnum:]][[:alnum:]._-]*)?)($|[^[:alnum:]_.-])'
+
+  fallback=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ -z "$fallback" ] && [ -n "${line//[[:space:]]/}" ]; then
+      fallback="$line"
+    fi
+    if [[ "$line" =~ $version_pattern ]]; then
+      printf '%s\n' "${BASH_REMATCH[2]}"
+      return 0
+    fi
+  done <<< "$output"
+
+  if [ -n "$fallback" ]; then
+    printf '%s\n' "$fallback"
+  fi
+  return 0
 }
 
 version_for() {
@@ -181,22 +205,22 @@ version_for() {
   command_base="$(basename "$command_name")"
   case "$command_base" in
     gs)
-      first_output_line "$command_name" --version
+      version_output "$command_name" --version
       ;;
     pdftotext)
-      first_output_line "$command_name" -v
+      version_output "$command_name" -v
       ;;
     shfmt)
-      first_output_line "$command_name" -version
+      version_output "$command_name" -version
       ;;
     ffmpeg)
-      first_output_line "$command_name" -version
+      version_output "$command_name" -version
       ;;
     exiftool)
-      first_output_line "$command_name" -ver
+      version_output "$command_name" -ver
       ;;
     *)
-      first_output_line "$command_name" --version
+      version_output "$command_name" --version
       ;;
   esac
 }

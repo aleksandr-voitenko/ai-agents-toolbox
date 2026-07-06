@@ -119,21 +119,51 @@ version_for() {
   local command_name="$1"
   case "$command_name" in
     gs)
-      "$command_name" --version 2>&1 | head -n 1
+      version_output "$command_name" --version
       ;;
     pdftotext)
-      "$command_name" -v 2>&1 | head -n 1
+      version_output "$command_name" -v
       ;;
     ffmpeg)
-      "$command_name" -version 2>&1 | head -n 1
+      version_output "$command_name" -version
       ;;
     exiftool)
-      "$command_name" -ver 2>&1 | head -n 1
+      version_output "$command_name" -ver
       ;;
     *)
-      "$command_name" --version 2>&1 | head -n 1
+      version_output "$command_name" --version
       ;;
   esac
+}
+
+version_output() {
+  local output
+  output="$("$@" 2>&1)" || return 1
+  extract_version_from_output "$output"
+}
+
+extract_version_from_output() {
+  local output="$1"
+  local line fallback
+  # Keep attached prefixes and suffixes like jq-1.7.1-apple or v1.2.3-main,
+  # but discard surrounding banner text, URLs, dates, and build metadata.
+  local version_pattern='(^|[^[:alnum:]_.-])(([[:alpha:]_]+-)?v?[0-9]+([.][0-9]+)+([-+][[:alnum:]][[:alnum:]._-]*)?)($|[^[:alnum:]_.-])'
+
+  fallback=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ -z "$fallback" ] && [ -n "${line//[[:space:]]/}" ]; then
+      fallback="$line"
+    fi
+    if [[ "$line" =~ $version_pattern ]]; then
+      printf '%s\n' "${BASH_REMATCH[2]}"
+      return 0
+    fi
+  done <<< "$output"
+
+  if [ -n "$fallback" ]; then
+    printf '%s\n' "$fallback"
+  fi
+  return 0
 }
 
 version_for_display() {

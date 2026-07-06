@@ -181,6 +181,34 @@ add_fake_long_version_tool() {
     'esac'
 }
 
+add_fake_multiline_shellcheck_tool() {
+  local bin_dir="$1"
+  write_executable "$bin_dir/shellcheck" \
+    'case "$1" in' \
+    '  --version)' \
+    '  printf "ShellCheck - shell script analysis tool\n"' \
+    '  printf "version: 0.11.0\n"' \
+    '  printf "license: GNU General Public License, version 3\n"' \
+    '  ;;' \
+    '  *)' \
+    '  exit 2' \
+    '  ;;' \
+    'esac'
+}
+
+add_fake_cluttered_imagemagick_tool() {
+  local bin_dir="$1"
+  write_executable "$bin_dir/magick" \
+    'case "$1" in' \
+    '  --version)' \
+    '  printf "Version: ImageMagick 7.1.2-23 Q16-HDRI aarch64 hidden-tail\n"' \
+    '  ;;' \
+    '  *)' \
+    '  exit 2' \
+    '  ;;' \
+    'esac'
+}
+
 add_fake_verbose_ffmpeg_tool() {
   local bin_dir="$1"
   write_executable "$bin_dir/ffmpeg" \
@@ -517,6 +545,27 @@ test_linux_caps_long_version_output() {
   assert_not_contains "$output" "hidden-tail" "linux should omit text beyond the version display cap"
 }
 
+test_linux_extracts_precise_version_strings() {
+  local dir bin output
+  dir="$(new_case_dir linux-precise-versions)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_multiline_shellcheck_tool "$bin"
+  add_fake_cluttered_imagemagick_tool "$bin"
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
+
+  assert_contains "$output" "[found]   shellcheck" "linux should find fake ShellCheck"
+  assert_contains "$output" "0.11.0" "linux should scan later version output lines"
+  assert_not_contains "$output" "ShellCheck - shell script analysis tool" "linux should not report ShellCheck's descriptive banner"
+  assert_not_contains "$output" "license: GNU" "linux should not report later ShellCheck metadata"
+  assert_contains "$output" "[found]   imagemagick" "linux should find fake ImageMagick"
+  assert_contains "$output" "7.1.2-23" "linux should extract ImageMagick's compact version token"
+  assert_not_contains "$output" "Version: ImageMagick" "linux should not report ImageMagick's verbose banner"
+  assert_not_contains "$output" "Q16-HDRI" "linux should not report ImageMagick build metadata"
+}
+
 test_linux_formats_display_paths() {
   local dir bin output home node_dir long_dir path_value home_marker
   dir="$(new_case_dir linux-display-paths)"
@@ -574,7 +623,7 @@ test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure() {
   run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
 
   assert_contains "$output" "[found]   ffmpeg" "linux should find fake FFmpeg"
-  assert_contains "$output" "ffmpeg version 1.0" "linux should report the first FFmpeg version line"
+  assert_contains "$output" "1.0" "linux should report FFmpeg's compact version token"
   assert_contains "$output" "Version checks failed:  0" "linux should not fail verbose FFmpeg version checks"
   assert_not_contains "$output" "version check failed" "linux should not let head/pipefail break verbose FFmpeg checks"
 }
@@ -708,6 +757,27 @@ test_macos_caps_long_version_output() {
   assert_not_contains "$output" "hidden-tail" "macOS should omit text beyond the version display cap"
 }
 
+test_macos_extracts_precise_version_strings() {
+  local dir bin output
+  dir="$(new_case_dir macos-precise-versions)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  add_common_shell_utilities "$bin"
+  add_fake_multiline_shellcheck_tool "$bin"
+  add_fake_cluttered_imagemagick_tool "$bin"
+
+  run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
+
+  assert_contains "$output" "[found]   shellcheck" "macOS should find fake ShellCheck"
+  assert_contains "$output" "0.11.0" "macOS should scan later version output lines"
+  assert_not_contains "$output" "ShellCheck - shell script analysis tool" "macOS should not report ShellCheck's descriptive banner"
+  assert_not_contains "$output" "license: GNU" "macOS should not report later ShellCheck metadata"
+  assert_contains "$output" "[found]   imagemagick" "macOS should find fake ImageMagick"
+  assert_contains "$output" "7.1.2-23" "macOS should extract ImageMagick's compact version token"
+  assert_not_contains "$output" "Version: ImageMagick" "macOS should not report ImageMagick's verbose banner"
+  assert_not_contains "$output" "Q16-HDRI" "macOS should not report ImageMagick build metadata"
+}
+
 test_macos_formats_display_paths() {
   local dir bin output home node_dir long_dir path_value home_marker
   dir="$(new_case_dir macos-display-paths)"
@@ -767,6 +837,7 @@ run_test "linux zypper rebuilds metadata after install failure" test_linux_zyppe
 run_test "linux GitHub release downloads use token" test_linux_github_release_downloads_use_token_when_available
 run_test "linux empty successful version output is not a failure" test_linux_empty_successful_version_output_is_not_a_failure
 run_test "linux caps long version output" test_linux_caps_long_version_output
+run_test "linux extracts precise version strings" test_linux_extracts_precise_version_strings
 run_test "linux formats display paths" test_linux_formats_display_paths
 run_test "linux finds vendor_perl ExifTool" test_linux_finds_vendor_perl_exiftool
 run_test "linux verbose FFmpeg version output is not a pipefail failure" test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure
@@ -777,5 +848,6 @@ run_test "macOS install-missing uses Homebrew" test_macos_install_missing_uses_b
 run_test "macOS install-missing without Homebrew prints guidance" test_macos_install_without_brew_prints_guidance
 run_test "macOS empty successful version output is not a failure" test_macos_empty_successful_version_output_is_not_a_failure
 run_test "macOS caps long version output" test_macos_caps_long_version_output
+run_test "macOS extracts precise version strings" test_macos_extracts_precise_version_strings
 run_test "macOS formats display paths" test_macos_formats_display_paths
 run_test "macOS upgrade-managed uses Homebrew owner" test_macos_upgrade_managed_uses_homebrew_owner
