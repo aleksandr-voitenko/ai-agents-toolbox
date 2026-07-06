@@ -395,6 +395,9 @@ detect_source() {
     /snap/*|/var/lib/snapd/*)
       printf 'snap'
       ;;
+    "$HOME"/.nvm/versions/node/*/bin/*)
+      printf 'nvm'
+      ;;
     "$HOME"/.cargo/bin/*)
       printf 'cargo'
       ;;

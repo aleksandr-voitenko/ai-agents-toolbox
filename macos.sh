@@ -314,6 +314,9 @@ detect_source() {
     /usr/bin/*|/bin/*|/usr/sbin/*|/sbin/*)
       printf 'system'
       ;;
+    "$HOME"/.nvm/versions/node/*/bin/*)
+      printf 'nvm'
+      ;;
     "$HOME"/.cargo/bin/*)
       printf 'cargo'
       ;;
@@ -448,7 +451,7 @@ while IFS='|' read -r name commands brew_package; do
         fi
       fi
       ;;
-    unknown|cargo|system|uv:*)
+    unknown|cargo|nvm|system|uv:*)
       if [ "$UPGRADE_MANAGED" -eq 1 ]; then
         unmanaged_count=$((unmanaged_count + 1))
         echo "  skip upgrade: existing command is not managed by Homebrew."

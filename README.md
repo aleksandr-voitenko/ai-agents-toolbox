@@ -321,10 +321,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests/windows-setup-tools-tests.ps
 ## Notes
 
 The source detection is best effort. It is usually reliable for Homebrew,
-apt/dpkg, rpm/dnf, pacman, Scoop, Chocolatey, and many winget installs. Manual
-installs, custom shims, and PATH entries created by SDKs may be reported as
-`unknown`, `system`, `local`, `cargo`, or `npm-or-node`. Those are deliberately
-not upgraded or replaced.
+apt/dpkg, rpm/dnf, pacman, default `nvm` installs, Scoop, Chocolatey, and many
+winget installs. Manual installs, custom shims, and PATH entries created by SDKs
+may be reported as `unknown`, `system`, `local`, `cargo`, `nvm`, or
+`npm-or-node`. Those are deliberately not upgraded or replaced.
 
 Yarn may be reported as a Corepack shim. In that case the command exists, but
 the exact Yarn version is selected by each project through `packageManager` in

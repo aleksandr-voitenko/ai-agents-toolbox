@@ -35,6 +35,18 @@ assert_not_contains() {
   fi
 }
 
+assert_matches() {
+  local haystack="$1"
+  local pattern="$2"
+  local label="$3"
+  if ! grep -Eq "$pattern" "$haystack"; then
+    echo "Expected to match: $pattern" >&2
+    echo "In output:" >&2
+    cat "$haystack" >&2
+    fail "$label"
+  fi
+}
+
 assert_log_contains() {
   local log_file="$1"
   local needle="$2"
@@ -713,9 +725,29 @@ test_linux_formats_display_paths() {
   HOME="$home" run_with_path "$output" "$path_value" /bin/bash "$ROOT_DIR/linux.sh"
 
   assert_contains "$output" "$home_marker/.nvm/versions/node/v22.22.2/bin/node" "linux should display home paths with tilde"
+  assert_matches "$output" '^\[found\][[:space:]]+node[[:space:]]+[^[:space:]]+/\.nvm/versions/node/v22\.22\.2/bin/node[[:space:]]+nvm[[:space:]]+' "linux should report nvm as the Node source"
   assert_contains "$output" ".../versions/node/v22.22.2/bin/rg" "linux should preserve the useful tail when shortening long paths"
   assert_not_contains "$output" "$home/.nvm" "linux should not print the full home directory in display paths"
   assert_not_contains "$output" "path-segment-that-should-disappear" "linux should omit the middle of overlong display paths"
+}
+
+test_linux_upgrade_managed_skips_nvm() {
+  local dir bin output home node_dir path_value
+  dir="$(new_case_dir linux-upgrade-nvm)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  home="$dir/home"
+  node_dir="$home/.nvm/versions/node/v22.22.2/bin"
+  mkdir -p "$node_dir"
+  add_common_shell_utilities "$bin"
+  add_fake_tool "$node_dir" node
+  path_value="$node_dir:$bin"
+
+  HOME="$home" run_with_path "$output" "$path_value" /bin/bash "$ROOT_DIR/linux.sh" --upgrade-managed
+
+  assert_matches "$output" '^\[found\][[:space:]]+node[[:space:]]+[^[:space:]]+/\.nvm/versions/node/v22\.22\.2/bin/node[[:space:]]+nvm[[:space:]]+' "linux should report nvm as the Node source during upgrade checks"
+  assert_contains "$output" "skip upgrade: existing command is not owned by apt, rpm, or pacman." "linux should not upgrade nvm-managed Node"
+  assert_contains "$output" "Unmanaged upgrades skipped: 1" "linux should count nvm-managed Node as an unmanaged upgrade"
 }
 
 test_linux_finds_vendor_perl_exiftool() {
@@ -985,9 +1017,29 @@ test_macos_formats_display_paths() {
   HOME="$home" run_with_path "$output" "$path_value" /bin/bash "$ROOT_DIR/macos.sh"
 
   assert_contains "$output" "$home_marker/.nvm/versions/node/v22.22.2/bin/node" "macOS should display home paths with tilde"
+  assert_matches "$output" '^\[found\][[:space:]]+node[[:space:]]+[^[:space:]]+/\.nvm/versions/node/v22\.22\.2/bin/node[[:space:]]+nvm[[:space:]]+' "macOS should report nvm as the Node source"
   assert_contains "$output" ".../versions/node/v22.22.2/bin/rg" "macOS should preserve the useful tail when shortening long paths"
   assert_not_contains "$output" "$home/.nvm" "macOS should not print the full home directory in display paths"
   assert_not_contains "$output" "path-segment-that-should-disappear" "macOS should omit the middle of overlong display paths"
+}
+
+test_macos_upgrade_managed_skips_nvm() {
+  local dir bin output home node_dir path_value
+  dir="$(new_case_dir macos-upgrade-nvm)"
+  bin="$dir/bin"
+  output="$dir/output.txt"
+  home="$dir/home"
+  node_dir="$home/.nvm/versions/node/v22.22.2/bin"
+  mkdir -p "$node_dir"
+  add_common_shell_utilities "$bin"
+  add_fake_tool "$node_dir" node
+  path_value="$node_dir:$bin"
+
+  HOME="$home" run_with_path "$output" "$path_value" /bin/bash "$ROOT_DIR/macos.sh" --upgrade-managed
+
+  assert_matches "$output" '^\[found\][[:space:]]+node[[:space:]]+[^[:space:]]+/\.nvm/versions/node/v22\.22\.2/bin/node[[:space:]]+nvm[[:space:]]+' "macOS should report nvm as the Node source during upgrade checks"
+  assert_contains "$output" "skip upgrade: existing command is not managed by Homebrew." "macOS should not upgrade nvm-managed Node"
+  assert_contains "$output" "Unmanaged upgrades skipped: 1" "macOS should count nvm-managed Node as an unmanaged upgrade"
 }
 
 test_macos_upgrade_managed_uses_homebrew_owner() {
@@ -1028,6 +1080,7 @@ run_test "linux empty successful version output is not a failure" test_linux_emp
 run_test "linux caps long version output" test_linux_caps_long_version_output
 run_test "linux extracts precise version strings" test_linux_extracts_precise_version_strings
 run_test "linux formats display paths" test_linux_formats_display_paths
+run_test "linux upgrade-managed skips nvm" test_linux_upgrade_managed_skips_nvm
 run_test "linux finds vendor_perl ExifTool" test_linux_finds_vendor_perl_exiftool
 run_test "linux verbose FFmpeg version output is not a pipefail failure" test_linux_verbose_ffmpeg_version_output_is_not_a_pipefail_failure
 run_test "linux uses uv tool metadata when pre-commit version probe fails" test_linux_uses_uv_tool_metadata_when_pre_commit_version_probe_fails
@@ -1040,5 +1093,6 @@ run_test "macOS empty successful version output is not a failure" test_macos_emp
 run_test "macOS caps long version output" test_macos_caps_long_version_output
 run_test "macOS extracts precise version strings" test_macos_extracts_precise_version_strings
 run_test "macOS formats display paths" test_macos_formats_display_paths
+run_test "macOS upgrade-managed skips nvm" test_macos_upgrade_managed_skips_nvm
 run_test "macOS reports uv-managed pre-commit source" test_macos_reports_uv_managed_pre_commit_source
 run_test "macOS upgrade-managed uses Homebrew owner" test_macos_upgrade_managed_uses_homebrew_owner
