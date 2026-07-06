@@ -61,7 +61,7 @@ The scripts manage these logical tools across supported platforms:
 | `tar` | Tape archive utility for creating and extracting `.tar` archives. |
 | `zip` | ZIP archive creation utility. |
 | `unzip` | ZIP archive extraction utility. |
-| `rsync` | Incremental file synchronization and copy utility. |
+| `rsync` | Incremental file synchronization and copy utility. Not managed on Windows. |
 | `xxd` | Hex dump and reverse-hex-dump utility. |
 | `stat` | Filesystem metadata inspection utility. |
 | `realpath` | Canonical path resolution utility. |
@@ -81,20 +81,26 @@ names or paths.
 
 Some requested tools are supplied by default operating-system utilities on many
 machines. For example, macOS normally provides `tar`, `zip`, `unzip`, `rsync`,
-`xxd`, `stat`, and `realpath`; Homebrew fallback packages may expose
-GNU-prefixed command names such as `gtar`, `gstat`, and `grealpath`. Linux
-fallbacks install upstream `uv` and `ast-grep` release assets only where default
-distribution repositories do not provide native packages; openSUSE uses the
-newly installed `uv` to install `pre-commit` when zypper has no native package.
+`xxd`, `stat`, and `realpath`.
+
+Some install paths intentionally fall back outside normal package-manager
+mappings when default repositories do not provide reliable native packages. On
+Linux, those narrow fallbacks install upstream release assets for tools such as
+`uv` and `ast-grep`, and openSUSE uses the newly installed `uv` to install
+`pre-commit` when zypper has no native package.
+
 Some tools are intentionally platform-specific. `rsync` is managed on Linux and
 macOS, but is not a Windows requirement. Windows additionally manages `pwsh`
 through winget's `Microsoft.PowerShell` package; Linux and macOS do not require
-it. On Windows, `pre-commit` is installed with `uv tool install` when `uv` and
+it.
+
+On Windows, `pre-commit` is installed with `uv tool install` when `uv` and
 Python are available, and uv-managed `pre-commit` commands are reported with
 `uv:pre-commit` as their source. `ast-grep` has winget and Scoop mappings but no
-verified Chocolatey package. Machine-wide Chocolatey installs are skipped in
-auto install mode when the current shell is not elevated, because they normally
-write under `C:\ProgramData\chocolatey`.
+verified Chocolatey package.
+
+Machine-wide Chocolatey installs are skipped in auto install mode when the
+current shell is not elevated, because they normally write under `C:\ProgramData\chocolatey`.
 
 ## One-Line Installers
 
