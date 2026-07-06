@@ -8,8 +8,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PathDisplayWidth = 48
-$VersionDisplayMax = 80
+$PathDisplayWidth = 52
+$SourceDisplayWidth = 36
+$VersionDisplayMax = 48
 
 function Show-Help {
   @"
@@ -55,7 +56,7 @@ $Tools = @(
   @{ Name = "bat"; Commands = @("bat.exe", "bat"); Winget = "sharkdp.bat"; Scoop = "bat"; Choco = "bat" },
   @{ Name = "eza"; Commands = @("eza.exe", "eza"); Winget = "eza-community.eza"; Scoop = "eza"; Choco = "eza" },
   @{ Name = "fzf"; Commands = @("fzf.exe", "fzf"); Winget = "junegunn.fzf"; Scoop = "fzf"; Choco = "fzf" },
-  @{ Name = "tree"; Commands = @("tree.com", "tree.exe", "tree"); Winget = $null; Scoop = "tree"; Choco = "tree" },
+  @{ Name = "tree"; Commands = @("tree.exe", "tree", "tree.com"); Winget = $null; Scoop = "tree"; Choco = "tree" },
   @{ Name = "file"; Commands = @("file.exe", "file"); Winget = $null; Scoop = "file"; Choco = "file" },
   @{ Name = "pandoc"; Commands = @("pandoc.exe", "pandoc"); Winget = "JohnMacFarlane.Pandoc"; Scoop = "pandoc"; Choco = "pandoc" },
   @{ Name = "imagemagick"; Commands = @("magick.exe", "magick"); Winget = "ImageMagick.ImageMagick"; Scoop = "imagemagick"; Choco = "imagemagick" },
@@ -229,6 +230,38 @@ function Get-VersionArguments {
   return @("--version")
 }
 
+function Get-VersionFromOutput {
+  param([object[]]$Output)
+
+  # Match the shell scripts' compact token extraction, with Windows-specific
+  # handling for dotted suffixes and path-like values such as file.exe-5.45.
+  $versionPattern = '(^|[^A-Za-z0-9_.])(([A-Za-z_]+-)?v?[0-9]+([.][0-9]+)+(([-+][A-Za-z0-9][A-Za-z0-9._-]*)|([.][A-Za-z][A-Za-z0-9._-]*))?)($|[^A-Za-z0-9_.-])'
+  $fallback = $null
+
+  foreach ($entry in $Output) {
+    foreach ($line in ("$entry" -split '\r?\n')) {
+      $trimmed = $line.Trim()
+      if ($trimmed.Length -eq 0) {
+        continue
+      }
+
+      if ($null -eq $fallback) {
+        $fallback = $trimmed
+      }
+
+      $match = [regex]::Match($line, $versionPattern)
+      if ($match.Success) {
+        return $match.Groups[2].Value
+      }
+    }
+  }
+
+  if ($null -ne $fallback) {
+    return $fallback
+  }
+  return ""
+}
+
 function Get-VersionLine {
   param([System.Management.Automation.CommandInfo]$Command)
 
@@ -238,8 +271,8 @@ function Get-VersionLine {
   }
 
   try {
-    if ($commandName -eq "tree.com" -or $commandName -eq "tree.exe" -or $commandName -eq "tree") {
-      return "Windows tree command"
+    if ($commandName -eq "tree.com") {
+      return "Windows built-in; no version flag"
     }
 
     $commandPath = $Command.Source
@@ -260,9 +293,7 @@ function Get-VersionLine {
     }
     if ($exitCode -ne 0) { return "version check failed" }
 
-    $line = $output | Where-Object { "$_".Trim().Length -gt 0 } | Select-Object -First 1
-    if ($null -eq $line) { return "" }
-    return "$line".Trim()
+    return Get-VersionFromOutput $output
   } catch {
     return "version check failed"
   }
@@ -671,7 +702,7 @@ foreach ($tool in $Tools) {
 
   $versionDisplay = Format-VersionForDisplay $version
   $pathDisplay = Format-PathForDisplay $cmd.Source
-  Write-Host ("[found]   {0,-14} {1,-48} {2,-24} {3}" -f $tool.Name, $pathDisplay, $source, $versionDisplay)
+  Write-Host ("[found]   {0,-14} {1,-$PathDisplayWidth} {2,-$SourceDisplayWidth} {3}" -f $tool.Name, $pathDisplay, $source, $versionDisplay)
 
   if ($UpgradeManaged) {
     if ($source -like "winget:*" -or $source -like "scoop:*" -or $source -like "choco:*") {

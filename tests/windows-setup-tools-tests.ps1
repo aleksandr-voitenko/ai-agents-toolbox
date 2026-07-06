@@ -145,6 +145,48 @@ function Add-FakeMultiLineVersionTool {
   )
 }
 
+function Add-FakeShellCheckBannerVersionTool {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "shellcheck.cmd") -Lines @(
+    'if /I not "%1"=="--version" exit /b 2',
+    'echo ShellCheck - shell script analysis tool',
+    'echo version: 0.10.0',
+    'exit /b 0'
+  )
+}
+
+function Add-FakeImageMagickBannerVersionTool {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "magick.cmd") -Lines @(
+    'if /I not "%1"=="--version" exit /b 2',
+    'echo Version: ImageMagick 7.1.1-47 Q16-HDRI x64 abcdefg',
+    'exit /b 0'
+  )
+}
+
+function Add-FakeGitWindowsVersionTool {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "git.cmd") -Lines @(
+    'if /I not "%1"=="--version" exit /b 2',
+    'echo git version 2.50.0.windows.1',
+    'exit /b 0'
+  )
+}
+
+function Add-FakeFilePathVersionTool {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "file.cmd") -Lines @(
+    'if /I not "%1"=="--version" exit /b 2',
+    'echo C:\Users\example\scoop\apps\file\current\file.exe-5.45',
+    'echo magic file from %%WIN32_RESOURCE%%',
+    'exit /b 0'
+  )
+}
+
 function Add-FakePdftotextStderrVersionTool {
   param([string]$Directory)
 
@@ -195,6 +237,19 @@ function Add-FakeManager {
       )
     }
   }
+}
+
+function Add-FakeWingetPackageManager {
+  param(
+    [string]$Directory,
+    [string]$PackageId
+  )
+
+  Write-CmdFile -Path (Join-Path $Directory "winget.cmd") -Lines @(
+    'echo winget %*>>"%FAKE_COMMAND_LOG%"',
+    "if /I ""%1""==""list"" echo $PackageId $PackageId 1.0.0 winget",
+    'exit /b 0'
+  )
 }
 
 function Add-FakeFailingInstallManager {
@@ -410,7 +465,7 @@ try {
     $output = Invoke-Setup $ctx @{ CheckOnly = $true }
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
-    Assert-Contains $output "package version: ripgrep BurntSushi.ripgrep.MSVC 15.0.0 winget" "Windows should use package metadata for empty successful version output"
+    Assert-Contains $output "package version: ripgrep BurntSushi.ripgrep.M..." "Windows should use capped package metadata for empty successful version output"
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail successful empty version checks"
     Assert-NotContains $output "version output empty" "Windows should prefer package metadata when it is available"
     Assert-NotContains $output "version check failed" "Windows should not report successful empty version output as failed"
@@ -424,7 +479,7 @@ try {
     $output = Invoke-Setup $ctx @{ CheckOnly = $true }
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
-    Assert-Contains $output "12345678901234567890123456789012345678901234567890123456789012345678901234567..." "Windows should shorten long version output with ellipsis"
+    Assert-Contains $output "123456789012345678901234567890123456789012345..." "Windows should shorten long version output with ellipsis"
     Assert-NotContains $output "hidden-tail" "Windows should omit text beyond the version display cap"
   }
 
@@ -449,11 +504,11 @@ try {
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep"
     Assert-Contains $output "...\versions\v1\bin\rg.cmd" "Windows should preserve the useful tail when shortening long paths"
     Assert-NotContains $output "path-segment-that-should-disappear" "Windows should omit the middle of overlong display paths"
-    Assert-Contains $output "for-boundary\bin\sqlite3.cmd" "Windows should use available path column space when segment-boundary shortening would hide too much"
+    Assert-Contains $output "too-long-for-boundary\bin\sqlite3.cmd" "Windows should use the wider path column for useful path context"
     Assert-NotContains $output "~\AppData\Lo...\bin\sqlite3.cmd" "Windows should not collapse long home paths to a sparse executable-only tail"
   }
 
-  Run-Test "Windows multiline version output uses first line without failing" {
+  Run-Test "Windows multiline version output uses concise token without failing" {
     $ctx = New-TestContext "multiline-version"
     Add-FakeManager $ctx.Bin "winget"
     Add-FakeMultiLineVersionTool $ctx.Bin "rg"
@@ -461,10 +516,87 @@ try {
     $output = Invoke-Setup $ctx @{ CheckOnly = $true }
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake multiline ripgrep"
-    Assert-Contains $output "rg 1.0" "Windows should report the first useful version output line"
+    Assert-Contains $output "1.0" "Windows should report the concise version token"
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail a successful multiline version command"
+    Assert-NotContains $output "rg 1.0" "Windows should not keep the command-name prefix when a concise token is available"
     Assert-NotContains $output "rg build metadata" "Windows should not report later version output lines"
     Assert-NotContains $output "version check failed" "Windows should not report successful multiline version output as failed"
+  }
+
+  Run-Test "Windows extracts concise versions from verbose banners" {
+    $ctx = New-TestContext "version-banners"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeShellCheckBannerVersionTool $ctx.Bin
+    Add-FakeImageMagickBannerVersionTool $ctx.Bin
+    Add-FakeGitWindowsVersionTool $ctx.Bin
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   shellcheck" "Windows should find fake ShellCheck"
+    Assert-Contains $output "0.10.0" "Windows should scan past ShellCheck's banner to the real version"
+    Assert-NotContains $output "ShellCheck - shell script analysis tool" "Windows should not report ShellCheck's descriptive banner"
+    Assert-Contains $output "[found]   imagemagick" "Windows should find fake ImageMagick"
+    Assert-Contains $output "7.1.1-47" "Windows should keep ImageMagick's concise version token"
+    Assert-NotContains $output "Q16-HDRI x64" "Windows should not report ImageMagick build metadata as the version"
+    Assert-Contains $output "[found]   git" "Windows should find fake Git"
+    Assert-Contains $output "2.50.0.windows.1" "Windows should keep Git for Windows dotted suffixes"
+    Assert-NotContains $output "git version 2.50.0.windows.1" "Windows should not keep Git's command-name prefix"
+    Assert-Contains $output "Version checks failed:  0" "Windows should not fail successful verbose banner probes"
+  }
+
+  Run-Test "Windows aligns versions after long package sources" {
+    $ctx = New-TestContext "source-column-width"
+    Add-FakeWingetPackageManager $ctx.Bin "ImageMagick.ImageMagick"
+    Add-FakeImageMagickBannerVersionTool $ctx.Bin
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+    $line = $output -split "`r?`n" | Where-Object { $_ -match '^\[found\]\s+imagemagick' } | Select-Object -First 1
+
+    if (-not $line) {
+      Fail "Windows should report the fake ImageMagick line"
+    }
+    if ($line -notmatch 'winget:ImageMagick\.ImageMagick\s{4,}7\.1\.1-47') {
+      Write-Error "Expected long package source to keep padded spacing before version.`nLine:`n$line"
+      Fail "Windows should keep version columns aligned after long package names"
+    }
+  }
+
+  Run-Test "Windows extracts file versions from path-like output" {
+    $ctx = New-TestContext "file-path-version"
+    Add-FakeFilePathVersionTool $ctx.Bin
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   file" "Windows should find fake file"
+    Assert-Contains $output "5.45" "Windows should report file's compact version token"
+    Assert-NotContains $output "file.exe-5.45" "Windows should not report file's executable path as the version"
+    Assert-NotContains $output "magic file from" "Windows should not report file's magic database banner as the version"
+    Assert-Contains $output "Version checks failed:  0" "Windows should not fail file's path-like version output"
+  }
+
+  Run-Test "Windows prefers package tree over built-in tree fallback" {
+    $ctx = New-TestContext "tree-path-precedence"
+    $scoopShims = Join-Path $ctx.Root "scoop\shims"
+    New-Item -ItemType Directory -Force -Path $scoopShims | Out-Null
+    Add-FakeManager $ctx.Bin "scoop"
+    Add-FakeTool $scoopShims "tree"
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true } @($scoopShims)
+
+    Assert-Contains $output "[found]   tree" "Windows should find fake package tree"
+    Assert-Contains $output "scoop:tree" "Windows should report package tree ownership"
+    Assert-Contains $output "1.0" "Windows should report package tree's version"
+    Assert-NotContains $output "Windows tree command" "Windows should not prefer the built-in tree fallback over package tree"
+  }
+
+  Run-Test "Windows labels built-in tree as versionless" {
+    $ctx = New-TestContext "tree-builtin-versionless"
+
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+
+    Assert-Contains $output "[found]   tree" "Windows should find the built-in tree fallback"
+    Assert-Contains $output "Windows built-in; no version flag" "Windows should describe tree.com as a versionless built-in"
+    Assert-NotContains $output "Windows tree command" "Windows should not present the tree.com fallback as a version string"
   }
 
   Run-Test "Windows successful stderr version output is not a failure" {
@@ -474,8 +606,9 @@ try {
     $output = Invoke-Setup $ctx @{ CheckOnly = $true }
 
     Assert-Contains $output "[found]   pdftotext" "Windows should find fake pdftotext"
-    Assert-Contains $output "pdftotext version 25.12.0" "Windows should report successful stderr version output"
+    Assert-Contains $output "25.12.0" "Windows should report a concise stderr version token"
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail a successful stderr version command"
+    Assert-NotContains $output "pdftotext version 25.12.0" "Windows should not keep the stderr banner prefix when a concise token is available"
     Assert-NotContains $output "version check failed" "Windows should not report successful stderr version output as failed"
   }
 
@@ -506,7 +639,7 @@ try {
     }
 
     Assert-Contains $output "[found]   ripgrep" "Windows should find fake ripgrep despite an alias sharing the application name"
-    Assert-Contains $output "rg 1.0" "Windows should invoke the discovered executable path instead of the alias-shadowed command name"
+    Assert-Contains $output "1.0" "Windows should invoke the discovered executable path instead of the alias-shadowed command name"
     Assert-Contains $output "Version checks failed:  0" "Windows should not fail when command-name re-resolution is shadowed"
     Assert-NotContains $output "version check failed" "Windows should not report the alias-shadowed path check as failed"
   }
