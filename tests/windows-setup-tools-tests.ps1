@@ -179,6 +179,16 @@ function Add-FakeImageMagickBannerVersionTool {
   )
 }
 
+function Add-FakeDatedXxdVersionTool {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "xxd.cmd") -Lines @(
+    'if /I not "%1"=="--version" exit /b 2',
+    'echo xxd 2026-06-16 by Juergen Weigert et al. (Win32)',
+    'exit /b 0'
+  )
+}
+
 function Add-FakeGitWindowsVersionTool {
   param([string]$Directory)
 
@@ -691,6 +701,7 @@ try {
     Add-FakeShellCheckBannerVersionTool $ctx.Bin
     Add-FakeImageMagickBannerVersionTool $ctx.Bin
     Add-FakeGitWindowsVersionTool $ctx.Bin
+    Add-FakeDatedXxdVersionTool $ctx.Bin
 
     $output = Invoke-Setup $ctx @{ CheckOnly = $true }
 
@@ -703,6 +714,9 @@ try {
     Assert-Contains $output "[found]   git" "Windows should find fake Git"
     Assert-Contains $output "2.50.0.windows.1" "Windows should keep Git for Windows dotted suffixes"
     Assert-NotContains $output "git version 2.50.0.windows.1" "Windows should not keep Git's command-name prefix"
+    Assert-Contains $output "[found]   xxd" "Windows should find fake xxd"
+    Assert-Contains $output "2026-06-16" "Windows should use xxd's date when no dotted version exists"
+    Assert-NotContains $output "by Juergen" "Windows should not keep xxd author text in the fallback version"
     Assert-NotContains $output "Version checks failed:" "Windows should omit zero successful verbose banner version-check failures from the summary"
   }
 

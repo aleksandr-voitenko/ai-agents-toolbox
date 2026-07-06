@@ -257,12 +257,14 @@ is_pre_commit_uv_tool() {
 
 extract_version_from_output() {
   local output="$1"
-  local line fallback
+  local line fallback date_fallback
   # Keep attached prefixes and suffixes like jq-1.7.1-apple or v1.2.3-main,
-  # but discard surrounding banner text, URLs, dates, and build metadata.
+  # but discard surrounding banner text, URLs, and build metadata.
   local version_pattern='(^|[^[:alnum:]_.-])(([[:alpha:]_]+-)?v?[0-9]+([.][0-9]+)+([-+][[:alnum:]][[:alnum:]._-]*)?)($|[^[:alnum:]_.-])'
+  local date_pattern='(^|[^[:alnum:]_-])([0-9]{4}-[0-9]{2}-[0-9]{2})($|[^[:alnum:]_-])'
 
   fallback=""
+  date_fallback=""
   while IFS= read -r line || [ -n "$line" ]; do
     if [ -z "$fallback" ] && [ -n "${line//[[:space:]]/}" ]; then
       fallback="$line"
@@ -271,8 +273,15 @@ extract_version_from_output() {
       printf '%s\n' "${BASH_REMATCH[2]}"
       return 0
     fi
+    if [ -z "$date_fallback" ] && [[ "$line" =~ $date_pattern ]]; then
+      date_fallback="${BASH_REMATCH[2]}"
+    fi
   done <<< "$output"
 
+  if [ -n "$date_fallback" ]; then
+    printf '%s\n' "$date_fallback"
+    return 0
+  fi
   if [ -n "$fallback" ]; then
     printf '%s\n' "$fallback"
   fi

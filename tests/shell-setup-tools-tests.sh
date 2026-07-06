@@ -234,6 +234,19 @@ add_fake_cluttered_imagemagick_tool() {
     'esac'
 }
 
+add_fake_dated_xxd_tool() {
+  local bin_dir="$1"
+  write_executable "$bin_dir/xxd" \
+    'case "$1" in' \
+    '  --version)' \
+    '  printf "xxd 2025-08-24 by Juergen Weigert et al.\n"' \
+    '  ;;' \
+    '  *)' \
+    '  exit 2' \
+    '  ;;' \
+    'esac'
+}
+
 add_fake_verbose_ffmpeg_tool() {
   local bin_dir="$1"
   write_executable "$bin_dir/ffmpeg" \
@@ -723,6 +736,7 @@ test_linux_extracts_precise_version_strings() {
   add_common_shell_utilities "$bin"
   add_fake_multiline_shellcheck_tool "$bin"
   add_fake_cluttered_imagemagick_tool "$bin"
+  add_fake_dated_xxd_tool "$bin"
 
   run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
 
@@ -734,6 +748,9 @@ test_linux_extracts_precise_version_strings() {
   assert_contains "$output" "7.1.2-23" "linux should extract ImageMagick's compact version token"
   assert_not_contains "$output" "Version: ImageMagick" "linux should not report ImageMagick's verbose banner"
   assert_not_contains "$output" "Q16-HDRI" "linux should not report ImageMagick build metadata"
+  assert_contains "$output" "[found]   xxd" "linux should find fake xxd"
+  assert_contains "$output" "2025-08-24" "linux should use xxd's date when no dotted version exists"
+  assert_not_contains "$output" "by Juergen" "linux should not keep xxd author text in the fallback version"
 }
 
 test_linux_formats_display_paths() {
@@ -1033,6 +1050,7 @@ test_macos_extracts_precise_version_strings() {
   add_common_shell_utilities "$bin"
   add_fake_multiline_shellcheck_tool "$bin"
   add_fake_cluttered_imagemagick_tool "$bin"
+  add_fake_dated_xxd_tool "$bin"
 
   run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
 
@@ -1044,6 +1062,9 @@ test_macos_extracts_precise_version_strings() {
   assert_contains "$output" "7.1.2-23" "macOS should extract ImageMagick's compact version token"
   assert_not_contains "$output" "Version: ImageMagick" "macOS should not report ImageMagick's verbose banner"
   assert_not_contains "$output" "Q16-HDRI" "macOS should not report ImageMagick build metadata"
+  assert_contains "$output" "[found]   xxd" "macOS should find fake xxd"
+  assert_contains "$output" "2025-08-24" "macOS should use xxd's date when no dotted version exists"
+  assert_not_contains "$output" "by Juergen" "macOS should not keep xxd author text in the fallback version"
 }
 
 test_macos_formats_display_paths() {

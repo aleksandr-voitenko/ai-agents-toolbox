@@ -482,7 +482,9 @@ function Get-VersionFromOutput {
   # Match the shell scripts' compact token extraction, with Windows-specific
   # handling for dotted suffixes and path-like values such as file.exe-5.45.
   $versionPattern = '(^|[^A-Za-z0-9_.])(([A-Za-z_]+-)?v?[0-9]+([.][0-9]+)+(([-+][A-Za-z0-9][A-Za-z0-9._-]*)|([.][A-Za-z][A-Za-z0-9._-]*))?)($|[^A-Za-z0-9_.-])'
+  $datePattern = '(^|[^A-Za-z0-9_-])([0-9]{4}-[0-9]{2}-[0-9]{2})($|[^A-Za-z0-9_-])'
   $fallback = $null
+  $dateFallback = $null
 
   foreach ($entry in $Output) {
     foreach ($line in ("$entry" -split '\r?\n')) {
@@ -499,9 +501,19 @@ function Get-VersionFromOutput {
       if ($match.Success) {
         return $match.Groups[2].Value
       }
+
+      if ($null -eq $dateFallback) {
+        $dateMatch = [regex]::Match($line, $datePattern)
+        if ($dateMatch.Success) {
+          $dateFallback = $dateMatch.Groups[2].Value
+        }
+      }
     }
   }
 
+  if ($null -ne $dateFallback) {
+    return $dateFallback
+  }
   if ($null -ne $fallback) {
     return $fallback
   }
