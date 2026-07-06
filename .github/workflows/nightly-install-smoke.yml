@@ -84,11 +84,17 @@ jobs:
           if ($childExitCode -ne 0) {
             exit $childExitCode
           }
-          if (-not (Select-String -Path $checkLog -SimpleMatch "Version checks failed:  0" -Quiet)) {
+          $checkLogText = Get-Content -Raw -Path $checkLog
+          $checkSections = [regex]::Split($checkLogText, '(?m)^Checking developer tools for Windows\.\.\.')
+          $finalCheck = $checkSections[-1]
+          if ($checkSections.Count -gt 1) {
+            $finalCheck = "Checking developer tools for Windows...$finalCheck"
+          }
+          if ($finalCheck -notmatch '(?m)^\s*Version checks failed:\s+0\s*$') {
             throw "Expected Windows check-only version checks to be 0."
           }
           $expectedMissing = @("pre-commit", "ast-grep", "hexdump")
-          $missing = Select-String -Path $checkLog -Pattern '^\[missing\]\s+(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $missing = [regex]::Matches($finalCheck, '(?m)^\[missing\]\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }
           $unexpectedMissing = @($missing | Where-Object { $expectedMissing -notcontains $_ })
           if ($unexpectedMissing.Count -gt 0) {
             throw "Unexpected missing Windows tool(s) after Chocolatey install: $($unexpectedMissing -join ', ')"
@@ -191,11 +197,17 @@ jobs:
           if ($childExitCode -ne 0) {
             exit $childExitCode
           }
-          if (-not (Select-String -Path $checkLog -SimpleMatch "Version checks failed:  0" -Quiet)) {
+          $checkLogText = Get-Content -Raw -Path $checkLog
+          $checkSections = [regex]::Split($checkLogText, '(?m)^Checking developer tools for Windows\.\.\.')
+          $finalCheck = $checkSections[-1]
+          if ($checkSections.Count -gt 1) {
+            $finalCheck = "Checking developer tools for Windows...$finalCheck"
+          }
+          if ($finalCheck -notmatch '(?m)^\s*Version checks failed:\s+0\s*$') {
             throw "Expected Windows check-only version checks to be 0."
           }
           $expectedMissing = @("pre-commit", "ast-grep", "hexdump")
-          $missing = Select-String -Path $checkLog -Pattern '^\[missing\]\s+(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $missing = [regex]::Matches($finalCheck, '(?m)^\[missing\]\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }
           $unexpectedMissing = @($missing | Where-Object { $expectedMissing -notcontains $_ })
           if ($unexpectedMissing.Count -gt 0) {
             throw "Unexpected missing Windows tool(s) after Chocolatey install: $($unexpectedMissing -join ', ')"
