@@ -54,7 +54,7 @@ This conservative stance is the main project invariant.
 - Treat source detection as best effort and label uncertain cases honestly.
   Default Unix `nvm` installs may report `nvm`, but they remain unmanaged for
   upgrade behavior.
-- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `difftastic` -> `difft`, `typos-cli` -> `typos`, `libmagic` -> `file`, `ImageMagick`/`imagemagick` -> `magick` or `convert`, `libimage-exiftool-perl`/`perl-Image-ExifTool`/`perl-image-exiftool`/`exiftool` -> `exiftool` or `vendor_perl/exiftool`, `vim` -> `xxd`, `coreutils`/`mscoreutils` -> `stat` and `realpath`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
+- Preserve support for commands whose package name differs from their executable name, such as `sqlite` -> `sqlite3`, `git-delta` -> `delta`, `difftastic` -> `difft`, `typos-cli` -> `typos`, `libmagic` -> `file`, `ImageMagick`/`imagemagick` -> `magick` or `convert`, `libimage-exiftool-perl`/`perl-Image-ExifTool`/`perl-image-exiftool`/`exiftool` -> `exiftool` or `vendor_perl/exiftool`, `sevenzip`/`7zip` -> `7zz` or `7z`, `vim` -> `xxd`, `coreutils`/`mscoreutils` -> `stat` and `realpath`, `ghostscript` -> `gs`, and `poppler`/`poppler-utils` -> `pdftotext`.
 - Be careful with Windows: PATH shims and multi-manager ownership can be messy. Prefer reporting uncertainty over making destructive assumptions.
 - Keep Windows package mappings blank when a supported manager does not expose
   the requested command reliably. `pre-commit` is the narrow exception: when

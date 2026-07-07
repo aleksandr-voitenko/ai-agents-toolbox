@@ -75,6 +75,7 @@ support:
 
 ### Shell, archive, and system utilities
 
+- `7zip` (`7z`/`7zz`) - Multi-format archiver for `.7z` files and uncommon downloaded archives.
 - `bat` - Syntax-highlighting file viewer and `cat` replacement.
 - `curl` - URL client for HTTP requests, downloads, and install bootstrapping.
 - `eza` - Modern directory listing tool and `ls` replacement.
@@ -94,9 +95,10 @@ support:
 Some tools have different package names than command names. For example,
 `sqlite3` may be installed by a `sqlite` package, `delta` is often installed by
 the `git-delta` package, `difft` by `difftastic`, and `typos` by Homebrew's
-`typos-cli` formula. Some Linux distributions also package `pandoc`, `ffmpeg`,
-ImageMagick, ExifTool, `xxd`, `stat`, and `realpath` under distribution-specific
-names or paths.
+`typos-cli` formula. Homebrew provides `7zip` through the `sevenzip` formula and
+its `7zz` executable, while most other supported managers expose `7z`. Some
+Linux distributions also package `pandoc`, `ffmpeg`, ImageMagick, ExifTool,
+`xxd`, `stat`, and `realpath` under distribution-specific names or paths.
 
 Some requested tools are supplied by default operating-system utilities on many
 machines. For example, macOS normally provides `tar`, `zip`, `unzip`, `rsync`,

@@ -65,6 +65,7 @@ $Tools = @(
   @{ Name = "hyperfine"; Commands = @("hyperfine.exe", "hyperfine"); Winget = "sharkdp.hyperfine"; Scoop = "hyperfine"; Choco = "hyperfine" },
   @{ Name = "shellcheck"; Commands = @("shellcheck.exe", "shellcheck"); Winget = "koalaman.shellcheck"; Scoop = "shellcheck"; Choco = "shellcheck" },
   @{ Name = "shfmt"; Commands = @("shfmt.exe", "shfmt"); Winget = "mvdan.shfmt"; Scoop = "shfmt"; Choco = "shfmt" },
+  @{ Name = "7zip"; Commands = @("7z.exe", "7z", "7zz.exe", "7zz"); Winget = "7zip.7zip"; Scoop = "7zip"; Choco = "7zip" },
   @{ Name = "tar"; Commands = @("tar.exe", "tar"); Winget = $null; Scoop = $null; Choco = $null },
   @{ Name = "zip"; Commands = @("zip.exe", "zip"); Winget = $null; Scoop = "zip"; Choco = "zip" },
   @{ Name = "unzip"; Commands = @("unzip.exe", "unzip"); Winget = $null; Scoop = "unzip"; Choco = "unzip" },
@@ -462,6 +463,9 @@ function Get-VersionArguments {
   }
   if ($baseName -eq "pdftotext") {
     return @("-v")
+  }
+  if ($baseName -eq "7z" -or $baseName -eq "7zz") {
+    return @()
   }
   if ($baseName -eq "zip" -or $baseName -eq "unzip") {
     return @("-v")

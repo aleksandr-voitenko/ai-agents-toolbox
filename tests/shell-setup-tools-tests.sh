@@ -265,6 +265,17 @@ add_fake_verbose_ffmpeg_tool() {
     'esac'
 }
 
+add_fake_7zip_banner_tool() {
+  local bin_dir="$1"
+  local command_name="$2"
+  write_executable "$bin_dir/$command_name" \
+    'if [ "$#" -ne 0 ]; then' \
+    '  printf "unsupported version flag\n" >&2' \
+    '  exit 2' \
+    'fi' \
+    'printf "7-Zip 26.02 (fake)\n"'
+}
+
 add_fake_linux_manager() {
   local bin_dir="$1"
   local manager="$2"
@@ -517,7 +528,7 @@ test_linux_summary_prints_failed_version_count_when_nonzero() {
 test_linux_install_missing_uses_selected_managers() {
   local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos
   local expected_just expected_difftastic expected_pandoc expected_imagemagick expected_ffmpeg expected_exiftool last_expected
-  local expected_uv expected_pre_commit expected_ast_grep expected_zip expected_rsync expected_xxd expected_stat uv_release_dir
+  local expected_uv expected_pre_commit expected_ast_grep expected_7zip expected_zip expected_rsync expected_xxd expected_stat uv_release_dir
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -562,6 +573,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_uv="install -m 0755 $uv_release_dir/uv /usr/local/bin/uv"
         expected_pre_commit="apt-get install -y pre-commit"
         expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
+        expected_7zip="apt-get install -y 7zip"
         expected_zip="apt-get install -y zip"
         expected_rsync="apt-get install -y rsync"
         expected_xxd="apt-get install -y xxd"
@@ -584,6 +596,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_uv="dnf install -y uv"
         expected_pre_commit="dnf install -y pre-commit"
         expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
+        expected_7zip="dnf install -y 7zip"
         expected_zip="dnf install -y zip"
         expected_rsync="dnf install -y rsync"
         expected_xxd="dnf install -y xxd"
@@ -606,6 +619,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_uv="pacman -S --needed --noconfirm uv"
         expected_pre_commit="pacman -S --needed --noconfirm pre-commit"
         expected_ast_grep="pacman -S --needed --noconfirm ast-grep"
+        expected_7zip="pacman -S --needed --noconfirm 7zip"
         expected_zip="pacman -S --needed --noconfirm zip"
         expected_rsync="pacman -S --needed --noconfirm rsync"
         expected_xxd="pacman -S --needed --noconfirm vim"
@@ -628,6 +642,7 @@ test_linux_install_missing_uses_selected_managers() {
         expected_uv="install -m 0755 $uv_release_dir/uv /usr/local/bin/uv"
         expected_pre_commit="uv tool install --python python3 --no-managed-python --no-python-downloads pre-commit UV_TOOL_DIR=/usr/local/share/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin"
         expected_ast_grep="install -m 0755 ast-grep /usr/local/bin/ast-grep"
+        expected_7zip="zypper install -y 7zip"
         expected_zip="zypper install -y zip"
         expected_rsync="zypper install -y rsync"
         expected_xxd="zypper install -y vim"
@@ -650,6 +665,7 @@ test_linux_install_missing_uses_selected_managers() {
     assert_log_contains "$log" "$expected_uv" "linux install should map uv for $manager"
     assert_log_contains "$log" "$expected_pre_commit" "linux install should map pre-commit for $manager"
     assert_log_contains "$log" "$expected_ast_grep" "linux install should map ast-grep for $manager"
+    assert_log_contains "$log" "$expected_7zip" "linux install should map 7zip for $manager"
     assert_log_contains "$log" "$expected_zip" "linux install should map zip for $manager"
     assert_log_contains "$log" "$expected_rsync" "linux install should map rsync for $manager"
     assert_log_contains "$log" "$expected_xxd" "linux install should map xxd for $manager"
@@ -736,6 +752,7 @@ test_linux_extracts_precise_version_strings() {
   add_common_shell_utilities "$bin"
   add_fake_multiline_shellcheck_tool "$bin"
   add_fake_cluttered_imagemagick_tool "$bin"
+  add_fake_7zip_banner_tool "$bin" 7z
   add_fake_dated_xxd_tool "$bin"
 
   run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh"
@@ -748,6 +765,9 @@ test_linux_extracts_precise_version_strings() {
   assert_contains "$output" "7.1.2-23" "linux should extract ImageMagick's compact version token"
   assert_not_contains "$output" "Version: ImageMagick" "linux should not report ImageMagick's verbose banner"
   assert_not_contains "$output" "Q16-HDRI" "linux should not report ImageMagick build metadata"
+  assert_contains "$output" "[found]   7zip" "linux should find fake 7zip"
+  assert_contains "$output" "26.02" "linux should parse 7zip's no-argument version banner"
+  assert_not_contains "$output" "unsupported version flag" "linux should not call 7zip with an unsupported version flag"
   assert_contains "$output" "[found]   xxd" "linux should find fake xxd"
   assert_contains "$output" "2025-08-24" "linux should use xxd's date when no dotted version exists"
   assert_not_contains "$output" "by Juergen" "linux should not keep xxd author text in the fallback version"
@@ -953,6 +973,7 @@ test_macos_install_missing_uses_brew() {
   assert_log_contains "$log" "brew install imagemagick" "macOS install should map ImageMagick to Homebrew"
   assert_log_contains "$log" "brew install ffmpeg" "macOS install should map ffmpeg to Homebrew"
   assert_log_contains "$log" "brew install exiftool" "macOS install should map exiftool to Homebrew"
+  assert_log_contains "$log" "brew install sevenzip" "macOS install should map 7zip to Homebrew sevenzip"
   assert_log_contains "$log" "brew install gnu-tar" "macOS install should map tar to GNU tar"
   assert_log_contains "$log" "brew install zip" "macOS install should map zip to Homebrew"
   assert_log_contains "$log" "brew install unzip" "macOS install should map unzip to Homebrew"
@@ -1050,6 +1071,7 @@ test_macos_extracts_precise_version_strings() {
   add_common_shell_utilities "$bin"
   add_fake_multiline_shellcheck_tool "$bin"
   add_fake_cluttered_imagemagick_tool "$bin"
+  add_fake_7zip_banner_tool "$bin" 7zz
   add_fake_dated_xxd_tool "$bin"
 
   run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/macos.sh"
@@ -1062,6 +1084,9 @@ test_macos_extracts_precise_version_strings() {
   assert_contains "$output" "7.1.2-23" "macOS should extract ImageMagick's compact version token"
   assert_not_contains "$output" "Version: ImageMagick" "macOS should not report ImageMagick's verbose banner"
   assert_not_contains "$output" "Q16-HDRI" "macOS should not report ImageMagick build metadata"
+  assert_contains "$output" "[found]   7zip" "macOS should find fake 7zip"
+  assert_contains "$output" "26.02" "macOS should parse 7zip's no-argument version banner"
+  assert_not_contains "$output" "unsupported version flag" "macOS should not call 7zip with an unsupported version flag"
   assert_contains "$output" "[found]   xxd" "macOS should find fake xxd"
   assert_contains "$output" "2025-08-24" "macOS should use xxd's date when no dotted version exists"
   assert_not_contains "$output" "by Juergen" "macOS should not keep xxd author text in the fallback version"

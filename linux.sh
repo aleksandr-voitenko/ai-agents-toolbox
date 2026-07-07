@@ -90,6 +90,7 @@ exiftool|exiftool,vendor_perl/exiftool|libimage-exiftool-perl|perl-Image-ExifToo
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck
 shfmt|shfmt|shfmt|shfmt|shfmt|shfmt
+7zip|7z,7zz|7zip|7zip|7zip|7zip
 tar|tar|tar|tar|tar|tar
 zip|zip|zip|zip|zip|zip
 unzip|unzip|unzip|unzip|unzip|unzip
@@ -298,6 +299,9 @@ version_for() {
       ;;
     pdftotext)
       version_output "$command_name" -v
+      ;;
+    7z|7zz)
+      version_output "$command_name"
       ;;
     zip|unzip)
       version_output "$command_name" -v

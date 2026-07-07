@@ -189,6 +189,16 @@ function Add-FakeDatedXxdVersionTool {
   )
 }
 
+function Add-Fake7ZipBannerVersionTool {
+  param([string]$Directory)
+
+  Write-CmdFile -Path (Join-Path $Directory "7z.cmd") -Lines @(
+    'if not "%1"=="" exit /b 2',
+    'echo 7-Zip 26.02 (fake)',
+    'exit /b 0'
+  )
+}
+
 function Add-FakeGitWindowsVersionTool {
   param([string]$Directory)
 
@@ -479,6 +489,7 @@ try {
         Assert-LogContains $ctx.Log "winget install --id ImageMagick.ImageMagick" "Windows should install ImageMagick with winget"
         Assert-LogContains $ctx.Log "winget install --id Gyan.FFmpeg" "Windows should install ffmpeg with winget"
         Assert-LogContains $ctx.Log "winget install --id OliverBetz.ExifTool" "Windows should install exiftool with winget"
+        Assert-LogContains $ctx.Log "winget install --id 7zip.7zip" "Windows should install 7zip with winget"
         Assert-LogContains $ctx.Log "winget install --id astral-sh.uv" "Windows should install uv with winget"
         Assert-LogContains $ctx.Log "winget install --id Microsoft.PowerShell" "Windows should install PowerShell with winget"
         Assert-LogContains $ctx.Log "winget install --id ast-grep.ast-grep" "Windows should install ast-grep with winget"
@@ -509,6 +520,7 @@ try {
         Assert-LogContains $ctx.Log "scoop install imagemagick" "Windows should install ImageMagick with Scoop"
         Assert-LogContains $ctx.Log "scoop install ffmpeg" "Windows should install ffmpeg with Scoop"
         Assert-LogContains $ctx.Log "scoop install exiftool" "Windows should install exiftool with Scoop"
+        Assert-LogContains $ctx.Log "scoop install 7zip" "Windows should install 7zip with Scoop"
         Assert-LogContains $ctx.Log "scoop install uv" "Windows should install uv with Scoop"
         Assert-LogContains $ctx.Log "scoop install ast-grep" "Windows should install ast-grep with Scoop"
         Assert-LogContains $ctx.Log "scoop install zip" "Windows should install zip with Scoop"
@@ -533,6 +545,7 @@ try {
         Assert-LogContains $ctx.Log "choco install imagemagick -y" "Windows should install ImageMagick with Chocolatey"
         Assert-LogContains $ctx.Log "choco install ffmpeg -y" "Windows should install ffmpeg with Chocolatey"
         Assert-LogContains $ctx.Log "choco install exiftool -y" "Windows should install exiftool with Chocolatey"
+        Assert-LogContains $ctx.Log "choco install 7zip -y" "Windows should install 7zip with Chocolatey"
         Assert-LogContains $ctx.Log "choco install uv -y" "Windows should install uv with Chocolatey"
         Assert-LogContains $ctx.Log "choco install zip -y" "Windows should install zip with Chocolatey"
         Assert-LogContains $ctx.Log "choco install unzip -y" "Windows should install unzip with Chocolatey"
@@ -700,6 +713,7 @@ try {
     Add-FakeManager $ctx.Bin "winget"
     Add-FakeShellCheckBannerVersionTool $ctx.Bin
     Add-FakeImageMagickBannerVersionTool $ctx.Bin
+    Add-Fake7ZipBannerVersionTool $ctx.Bin
     Add-FakeGitWindowsVersionTool $ctx.Bin
     Add-FakeDatedXxdVersionTool $ctx.Bin
 
@@ -711,6 +725,8 @@ try {
     Assert-Contains $output "[found]   imagemagick" "Windows should find fake ImageMagick"
     Assert-Contains $output "7.1.1-47" "Windows should keep ImageMagick's concise version token"
     Assert-NotContains $output "Q16-HDRI x64" "Windows should not report ImageMagick build metadata as the version"
+    Assert-Contains $output "[found]   7zip" "Windows should find fake 7zip"
+    Assert-Contains $output "26.02" "Windows should parse 7zip's no-argument version banner"
     Assert-Contains $output "[found]   git" "Windows should find fake Git"
     Assert-Contains $output "2.50.0.windows.1" "Windows should keep Git for Windows dotted suffixes"
     Assert-NotContains $output "git version 2.50.0.windows.1" "Windows should not keep Git's command-name prefix"

@@ -79,6 +79,7 @@ exiftool|exiftool|exiftool
 hyperfine|hyperfine|hyperfine
 shellcheck|shellcheck|shellcheck
 shfmt|shfmt|shfmt
+7zip|7zz,7z|sevenzip
 tar|tar,gtar|gnu-tar
 zip|zip|zip
 unzip|unzip|unzip
@@ -195,6 +196,9 @@ version_for() {
       ;;
     pdftotext)
       version_output "$command_name" -v
+      ;;
+    7z|7zz)
+      version_output "$command_name"
       ;;
     zip|unzip)
       version_output "$command_name" -v
