@@ -198,6 +198,10 @@ Automatically install missing tools:
 $u="https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/windows.ps1"; $f=Join-Path $env:TEMP "ai-agents-toolbox-windows.ps1"; Invoke-WebRequest -UseBasicParsing $u -OutFile $f; powershell -ExecutionPolicy Bypass -File $f -InstallMissing
 ```
 
+In the image below, you can find an example of executing the AI Agents Toolbox on a typical developer machine.
+
+<img width="1039" height="819" alt="Example of diagnostic with missing tools on macOS" src="https://github.com/user-attachments/assets/87f622be-8a72-419c-b479-4d1635a669ac" />
+
 ## Options
 
 ### macOS
