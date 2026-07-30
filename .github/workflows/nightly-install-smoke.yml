@@ -121,7 +121,8 @@ jobs:
             prepare: dnf -y makecache
           - manager: pacman
             image: archlinux:latest
-            prepare: pacman -Sy --noconfirm
+            # Arch does not support refreshing package databases without a full upgrade.
+            prepare: pacman -Syu --noconfirm
     steps:
       - uses: actions/checkout@v4
 
