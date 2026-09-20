@@ -367,12 +367,12 @@ add_fake_github_release_installers() {
     '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-aarch64-unknown-linux-musl.tar.gz\"}"' \
     '    ;;' \
     '  *api.github.com/repos/Wilfred/difftastic/releases/latest*)' \
-    '    printf "%s\n" "{\"name\":\"difft-x86_64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"name\":\"difft-0.71.0-x86_64-unknown-linux-gnu.tar.gz\"}"' \
     '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
-    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-x86_64-unknown-linux-gnu.tar.gz\"}"' \
-    '    printf "%s\n" "{\"name\":\"difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.71.0/difft-0.71.0-x86_64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"name\":\"difft-0.71.0-aarch64-unknown-linux-gnu.tar.gz\"}"' \
     '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
-    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.69.0/difft-aarch64-unknown-linux-gnu.tar.gz\"}"' \
+    '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/Wilfred/difftastic/releases/download/0.71.0/difft-0.71.0-aarch64-unknown-linux-gnu.tar.gz\"}"' \
     '    ;;' \
     '  *api.github.com/repos/astral-sh/uv/releases/latest*)' \
     '    printf "%s\n" "{\"name\":\"uv-x86_64-unknown-linux-gnu.tar.gz\"}"' \

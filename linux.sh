@@ -706,7 +706,10 @@ install_difftastic_release() {
     set -e
     cd "$tmp_dir"
     download_to_stdout "$api_url" > release.json
-    asset_name="$(sed -n "s#.*\"name\":[[:space:]]*\"\\(difft-${target}\\.tar\\.gz\\)\".*#\\1#p" release.json | head -n 1)"
+    asset_name="$(sed -n \
+      -e "s#.*\"name\":[[:space:]]*\"\\(difft-[0-9][^\"]*-${target}\\.tar\\.gz\\)\".*#\\1#p" \
+      -e "s#.*\"name\":[[:space:]]*\"\\(difft-${target}\\.tar\\.gz\\)\".*#\\1#p" \
+      release.json | head -n 1)"
     if [ -z "$asset_name" ]; then
       echo "Could not find a difftastic Linux $target release asset." >&2
       exit 1
