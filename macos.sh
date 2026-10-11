@@ -59,6 +59,7 @@ typos|typos|typos-cli
 clang-format|clang-format|clang-format
 gh|gh|gh
 git|git|git
+git-lfs|git-lfs|git-lfs
 git-delta|delta|git-delta
 just|just|just
 difftastic|difft|difftastic
@@ -92,6 +93,14 @@ pre-commit|pre-commit|pre-commit
 ast-grep|ast-grep|ast-grep
 ghostscript|gs|ghostscript
 pdftotext|pdftotext|poppler
+duckdb|duckdb|duckdb
+tesseract|tesseract|tesseract
+qpdf|qpdf|qpdf
+ffprobe|ffprobe|ffmpeg|ffmpeg
+pdfinfo|pdfinfo|poppler|pdftotext
+pdftoppm|pdftoppm|poppler|pdftotext
+pdftocairo|pdftocairo|poppler|pdftotext
+pdfimages|pdfimages|poppler|pdftotext
 EOF
 )
 
@@ -194,7 +203,7 @@ version_for() {
     gs)
       version_output "$command_name" --version
       ;;
-    pdftotext)
+    pdftotext|pdfinfo|pdftoppm|pdftocairo|pdfimages)
       version_output "$command_name" -v
       ;;
     7z|7zz)
@@ -203,7 +212,7 @@ version_for() {
     zip|unzip)
       version_output "$command_name" -v
       ;;
-    ffmpeg)
+    ffmpeg|ffprobe)
       version_output "$command_name" -version
       ;;
     exiftool)
@@ -409,18 +418,27 @@ brew_upgrade_if_outdated() {
 }
 
 missing_count=0
+missing_companion_count=0
 unmanaged_count=0
 failed_version_count=0
 
 echo "Checking developer tools for macOS..."
 echo
 
-while IFS='|' read -r name commands brew_package; do
+# The optional final column names a managed tool whose package supplies a
+# companion command. Check companions after provider installs, without taking
+# over an existing provider installation or upgrading its package again.
+while IFS='|' read -r name commands brew_package companion_of; do
   [ -z "$name" ] && continue
 
   command_path="$(find_command "$commands" || true)"
 
   if [ -z "$command_path" ]; then
+    if [ -n "$companion_of" ]; then
+      missing_companion_count=$((missing_companion_count + 1))
+      printf '[missing] %-14s companion of %s (package: %s)\n' "$name" "$companion_of" "$brew_package"
+      continue
+    fi
     missing_count=$((missing_count + 1))
     printf '[missing] %-14s package: %s\n' "$name" "$brew_package"
 
@@ -453,6 +471,8 @@ while IFS='|' read -r name commands brew_package; do
   path_display="$(path_for_display "$command_path")"
   printf '[found]   %-14s %-48s %-22s %s\n' "$name" "$path_display" "$source" "$version_display"
 
+  [ -n "$companion_of" ] && continue
+
   case "$source" in
     homebrew:*)
       if [ "$UPGRADE_MANAGED" -eq 1 ]; then
@@ -480,6 +500,10 @@ fi
 echo
 echo "Summary:"
 echo "  Missing packages: $missing_count"
+if [ "$missing_companion_count" -gt 0 ]; then
+  echo "  Missing companion commands: $missing_companion_count"
+  echo "  Check the listed provider installation and PATH for missing companions."
+fi
 if [ "$failed_version_count" -gt 0 ]; then
   echo "  Version checks failed:  $failed_version_count"
 fi

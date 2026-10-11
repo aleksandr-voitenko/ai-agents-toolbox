@@ -479,6 +479,12 @@ try {
       Assert-Contains $output "[missing] ripgrep" "Windows should report ripgrep missing for $manager"
 
       if ($manager -eq "winget") {
+        Assert-LogContains $ctx.Log "winget install --id GitHub.GitLFS" "Windows should install Git LFS with winget"
+        Assert-LogContains $ctx.Log "winget install --id DuckDB.cli" "Windows should install DuckDB with winget"
+        Assert-LogNotContains $ctx.Log "winget install --id QPDF.QPDF" "Windows should avoid qpdf's silent installer without PATH integration"
+        Assert-Contains $output "qpdf: available via Scoop or Chocolatey" "Windows should explain alternate qpdf installers"
+        Assert-LogNotContains $ctx.Log "winget install --id tesseract" "Windows should avoid the Tesseract installer without PATH integration"
+        Assert-Contains $output "tesseract: available via Scoop or Chocolatey" "Windows should explain alternate Tesseract installers"
         Assert-LogContains $ctx.Log "winget install --id BurntSushi.ripgrep.MSVC" "Windows should install ripgrep with winget"
         Assert-LogContains $ctx.Log "winget install --id SQLite.SQLite" "Windows should install sqlite3 with winget"
         Assert-LogContains $ctx.Log "winget install --id MikeFarah.yq" "Windows should install yq with winget"
@@ -507,6 +513,9 @@ try {
         Assert-Contains $output "Package manager reported install/upgrade completed" "Windows should explain when winget succeeds but the command remains unavailable"
         Assert-Contains $output "PATH entries." "Windows should hint at PATH and app alias fixes after winget succeeds without exposing the command"
       } elseif ($manager -eq "scoop") {
+        foreach ($package in @("git-lfs", "tesseract", "duckdb", "qpdf")) {
+          Assert-LogContains $ctx.Log "scoop install $package" "Windows should install $package with Scoop"
+        }
         Assert-LogContains $ctx.Log "scoop install ripgrep" "Windows should install ripgrep with Scoop"
         Assert-LogContains $ctx.Log "scoop install sqlite" "Windows should install sqlite3 with Scoop"
         Assert-LogContains $ctx.Log "scoop install yq" "Windows should install yq with Scoop"
@@ -532,6 +541,9 @@ try {
         Assert-NotContains $output "[missing] hexdump" "Windows should not report hexdump as a managed tool"
         Assert-NotContains $output "[missing] rsync" "Windows should not report rsync as a Windows-managed tool"
       } else {
+        foreach ($package in @("git-lfs", "tesseract", "duckdb", "qpdf")) {
+          Assert-LogContains $ctx.Log "choco install $package -y" "Windows should install $package with Chocolatey"
+        }
         Assert-LogContains $ctx.Log "choco install ripgrep -y" "Windows should install ripgrep with Chocolatey"
         Assert-LogContains $ctx.Log "choco install sqlite -y" "Windows should install sqlite3 with Chocolatey"
         Assert-LogContains $ctx.Log "choco install yq -y" "Windows should install yq with Chocolatey"
@@ -559,6 +571,72 @@ try {
         Assert-NotContains $output "[missing] rsync" "Windows should not report rsync as a Windows-managed tool"
       }
     }
+  }
+
+  Run-Test "Windows reports new tools and companion versions" {
+    $ctx = New-TestContext "new-tool-versions"
+    $probes = @(
+      @{ Name = "git-lfs"; Flag = "--version"; Banner = "git-lfs/3.8.0 (GitHub; windows amd64; go 1.26.0)"; Version = "3.8.0" },
+      @{ Name = "duckdb"; Flag = "--version"; Banner = "v1.5.6 (Variegata) 0123456789"; Version = "v1.5.6" },
+      @{ Name = "tesseract"; Flag = "--version"; Banner = "tesseract 5.5.3"; Version = "5.5.3" },
+      @{ Name = "qpdf"; Flag = "--version"; Banner = "qpdf version 12.4.2"; Version = "12.4.2" },
+      @{ Name = "ffprobe"; Flag = "-version"; Banner = "ffprobe version 8.0"; Version = "8.0" },
+      @{ Name = "pdfinfo"; Flag = "-v"; Banner = "pdfinfo version 25.12.0"; Version = "25.12.0" },
+      @{ Name = "pdftoppm"; Flag = "-v"; Banner = "pdftoppm version 25.12.0"; Version = "25.12.0" },
+      @{ Name = "pdftocairo"; Flag = "-v"; Banner = "pdftocairo version 25.12.0"; Version = "25.12.0" },
+      @{ Name = "pdfimages"; Flag = "-v"; Banner = "pdfimages version 25.12.0"; Version = "25.12.0" }
+    )
+    foreach ($probe in $probes) {
+      Write-CmdFile -Path (Join-Path $ctx.Bin "$($probe.Name).cmd") -Lines @(
+        ('if not "%*"=="{0}" exit /b 2' -f $probe.Flag),
+        "echo $($probe.Banner) 1>&2",
+        'exit /b 0'
+      )
+    }
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+    foreach ($probe in $probes) {
+      $line = $output -split "`r?`n" | Where-Object { $_ -match ('^\[found\]\s+' + [regex]::Escape($probe.Name) + '\s') } | Select-Object -First 1
+      if (-not $line) { Fail "Windows should find $($probe.Name)" }
+      Assert-Contains $line $probe.Version "Windows should report the version of $($probe.Name)"
+    }
+    Assert-NotContains $output "Version checks failed:" "New tools should use the correct version probes"
+    Assert-NotContains $output "Missing companion commands:" "All five companions should be found"
+  }
+
+  Run-Test "Windows companions preserve existing provider installations" {
+    $ctx = New-TestContext "companion-preservation"
+    Add-FakeManager $ctx.Bin "winget"
+    Add-FakeTool $ctx.Bin "ffmpeg"
+    Add-FakeTool $ctx.Bin "pdftotext"
+    Add-FakeTool $ctx.Bin "git-lfs"
+
+    $output = Invoke-Setup $ctx @{ InstallMissing = $true; Manager = "winget" }
+    Assert-Contains $output "Missing companion commands: 5" "Windows should count companions separately"
+    Assert-Contains $output "companion of pdftotext" "Windows should identify the Poppler provider"
+    Assert-LogNotContains $ctx.Log "winget install --id Gyan.FFmpeg" "Missing ffprobe must not replace custom FFmpeg"
+    Assert-LogNotContains $ctx.Log "winget install --id oschwartz10612.Poppler" "Missing companions must not replace custom Poppler"
+    Assert-LogNotContains $ctx.Log "winget install --id GitHub.GitLFS" "Existing Git LFS must not be replaced"
+    Assert-LogNotContains $ctx.Log "lfs install" "Detection must not initialize Git LFS configuration"
+  }
+
+  Run-Test "Windows companions do not repeat package upgrades" {
+    $ctx = New-TestContext "companion-upgrades"
+    Add-FakeWingetPackageManager $ctx.Bin "oschwartz10612.Poppler"
+    foreach ($name in @("pdftotext", "pdfinfo", "pdftoppm", "pdftocairo", "pdfimages")) {
+      Add-FakeTool $ctx.Bin $name
+    }
+    $output = Invoke-Setup $ctx @{ UpgradeManaged = $true }
+    $log = Get-Content -Raw -Path $ctx.Log
+    $count = [regex]::Matches($log, 'winget upgrade --id oschwartz10612\.Poppler').Count
+    if ($count -ne 1) { Fail "Poppler should be upgraded once, observed $count upgrades" }
+    Assert-Contains $output "[found]   pdfimages" "Windows should still report companions during upgrades"
+  }
+
+  Run-Test "Windows failed companion version probes remain failures" {
+    $ctx = New-TestContext "companion-version-failure"
+    Add-FakeFailingVersionTool $ctx.Bin "pdfinfo"
+    $output = Invoke-Setup $ctx @{ CheckOnly = $true }
+    Assert-Contains $output "Version checks failed:  1" "A failed companion probe must remain visible"
   }
 
   Run-Test "Windows reports uv-managed pre-commit source" {

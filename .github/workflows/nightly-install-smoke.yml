@@ -28,7 +28,7 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh | bash -s -- --install-missing
           curl -fsSL https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/macos.sh | bash -s -- --check-only | tee /tmp/setup-tools-url-check.log
           grep -q "Missing packages: 0" /tmp/setup-tools-url-check.log
-          ! grep -q "Version checks failed:" /tmp/setup-tools-url-check.log
+          ! grep -Eq "Version checks failed:|Missing companion commands:" /tmp/setup-tools-url-check.log
 
   linux-url-bootstrap-smoke:
     name: Linux URL bootstrap smoke (${{ matrix.downloader }})
@@ -60,7 +60,7 @@ jobs:
               wget -qO- https://raw.githubusercontent.com/aleksandr-voitenko/ai-agents-toolbox/main/linux.sh | bash -s -- --check-only | tee /tmp/setup-tools-url-check.log
             fi
             grep -q "Missing packages: 0" /tmp/setup-tools-url-check.log
-            ! grep -q "Version checks failed:" /tmp/setup-tools-url-check.log
+            ! grep -Eq "Version checks failed:|Missing companion commands:" /tmp/setup-tools-url-check.log
           '
 
   windows-url-bootstrap-smoke:
@@ -94,8 +94,8 @@ jobs:
           if ($checkSections.Count -gt 1) {
             $finalCheck = "Checking developer tools for Windows...$finalCheck"
           }
-          if ($finalCheck -match '(?m)^\s*Version checks failed:') {
-            throw "Expected Windows check-only to omit zero version-check failures."
+          if ($finalCheck -match '(?m)^\s*(Version checks failed|Missing companion commands):') {
+            throw "Expected Windows check-only to find all companions without version-check failures."
           }
           $expectedMissing = @("ast-grep")
           $missing = [regex]::Matches($finalCheck, '(?m)^\[missing\]\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }
@@ -153,7 +153,7 @@ jobs:
               ./linux.sh --install-missing --manager "${{ matrix.manager }}"
               ./linux.sh --check-only | tee /tmp/setup-tools-check.log
               grep -q "Missing packages: 0" /tmp/setup-tools-check.log
-              ! grep -q "Version checks failed:" /tmp/setup-tools-check.log
+              ! grep -Eq "Version checks failed:|Missing companion commands:" /tmp/setup-tools-check.log
             '
 
   macos-install-smoke:
@@ -171,7 +171,7 @@ jobs:
           ./macos.sh --install-missing
           ./macos.sh --check-only | tee /tmp/setup-tools-check.log
           grep -q "Missing packages: 0" /tmp/setup-tools-check.log
-          ! grep -q "Version checks failed:" /tmp/setup-tools-check.log
+          ! grep -Eq "Version checks failed:|Missing companion commands:" /tmp/setup-tools-check.log
 
   windows-install-smoke:
     name: Windows install smoke
@@ -203,8 +203,8 @@ jobs:
           if ($checkSections.Count -gt 1) {
             $finalCheck = "Checking developer tools for Windows...$finalCheck"
           }
-          if ($finalCheck -match '(?m)^\s*Version checks failed:') {
-            throw "Expected Windows check-only to omit zero version-check failures."
+          if ($finalCheck -match '(?m)^\s*(Version checks failed|Missing companion commands):') {
+            throw "Expected Windows check-only to find all companions without version-check failures."
           }
           $expectedMissing = @("ast-grep")
           $missing = [regex]::Matches($finalCheck, '(?m)^\[missing\]\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }

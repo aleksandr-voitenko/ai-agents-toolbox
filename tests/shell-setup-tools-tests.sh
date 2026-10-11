@@ -396,6 +396,15 @@ add_fake_github_release_installers() {
     '    printf "%s\n" "{\"digest\":\"sha256:fake\"}"' \
     '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/ast-grep/ast-grep/releases/download/0.44.1/app-aarch64-unknown-linux-gnu.zip\"}"' \
     '    ;;' \
+    '  *api.github.com/repos/duckdb/duckdb/releases/latest*)' \
+    '    for arch in amd64 arm64; do' \
+    '      printf "{\"name\":\"duckdb_cli-linux-%s.zip\"}\n" "$arch"' \
+    '      if [ "${FAKE_DUCKDB_FAILURE:-}" != "missing-digest" ]; then' \
+    '        printf "%s\n" "{\"digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}"' \
+    '      fi' \
+    '      printf "{\"browser_download_url\":\"https://github.com/duckdb/duckdb/releases/download/v1.5.6/duckdb_cli-linux-%s.zip\"}\n" "$arch"' \
+    '    done' \
+    '    ;;' \
     '  *uv-*-unknown-linux-gnu.tar.gz.sha256*)' \
     '    asset="${url##*/}"' \
     '    printf "fake  %s\n" "${asset%.sha256}"' \
@@ -430,6 +439,8 @@ add_fake_github_release_installers() {
     '  exit 0' \
     'fi' \
     'printf "unzip %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    'if [ "${FAKE_DUCKDB_FAILURE:-}" = "extract" ]; then exit 1; fi' \
+    'if [ "${FAKE_DUCKDB_FAILURE:-}" != "missing-binary" ]; then : > duckdb; fi' \
     ': > ast-grep' \
     ': > sg'
 
@@ -529,6 +540,7 @@ test_linux_install_missing_uses_selected_managers() {
   local manager dir bin log output expected expected_sqlite expected_delta expected_file expected_actionlint expected_typos
   local expected_just expected_difftastic expected_pandoc expected_imagemagick expected_ffmpeg expected_exiftool last_expected
   local expected_uv expected_pre_commit expected_ast_grep expected_7zip expected_zip expected_rsync expected_xxd expected_stat uv_release_dir
+  local expected_git_lfs expected_tesseract expected_duckdb expected_qpdf
 
   for manager in apt dnf pacman zypper; do
     dir="$(new_case_dir "linux-install-$manager")"
@@ -558,6 +570,10 @@ test_linux_install_missing_uses_selected_managers() {
 
     case "$manager" in
       apt)
+        expected_git_lfs="apt-get install -y git-lfs"
+        expected_tesseract="apt-get install -y tesseract-ocr"
+        expected_duckdb="install -m 0755 duckdb /usr/local/bin/duckdb"
+        expected_qpdf="apt-get install -y qpdf"
         expected="apt-get install -y ripgrep"
         expected_sqlite="apt-get install -y sqlite3"
         expected_delta="apt-get install -y git-delta"
@@ -581,6 +597,10 @@ test_linux_install_missing_uses_selected_managers() {
         last_expected="apt-get install -y poppler-utils"
         ;;
       dnf)
+        expected_git_lfs="dnf install -y git-lfs"
+        expected_tesseract="dnf install -y tesseract"
+        expected_duckdb="install -m 0755 duckdb /usr/local/bin/duckdb"
+        expected_qpdf="dnf install -y qpdf"
         expected="dnf install -y ripgrep"
         expected_sqlite="dnf install -y sqlite"
         expected_delta="dnf install -y git-delta"
@@ -604,6 +624,10 @@ test_linux_install_missing_uses_selected_managers() {
         last_expected="dnf install -y poppler-utils"
         ;;
       pacman)
+        expected_git_lfs="pacman -S --needed --noconfirm git-lfs"
+        expected_tesseract="pacman -S --needed --noconfirm tesseract"
+        expected_duckdb="pacman -S --needed --noconfirm duckdb"
+        expected_qpdf="pacman -S --needed --noconfirm qpdf"
         expected="pacman -S --needed --noconfirm ripgrep"
         expected_sqlite="pacman -S --needed --noconfirm sqlite"
         expected_delta="pacman -S --needed --noconfirm git-delta"
@@ -627,6 +651,10 @@ test_linux_install_missing_uses_selected_managers() {
         last_expected="pacman -S --needed --noconfirm poppler"
         ;;
       zypper)
+        expected_git_lfs="zypper install -y git-lfs"
+        expected_tesseract="zypper install -y tesseract-ocr"
+        expected_duckdb="install -m 0755 duckdb /usr/local/bin/duckdb"
+        expected_qpdf="zypper install -y qpdf"
         expected="zypper install -y ripgrep"
         expected_sqlite="zypper install -y sqlite3"
         expected_delta="zypper install -y git-delta"
@@ -651,6 +679,12 @@ test_linux_install_missing_uses_selected_managers() {
         ;;
     esac
     assert_log_contains "$log" "$expected" "linux install should use selected $manager manager"
+    assert_log_contains "$log" "$expected_git_lfs" "linux should map Git LFS for $manager"
+    assert_log_contains "$log" "$expected_tesseract" "linux should map the Tesseract OCR engine for $manager"
+    assert_log_contains "$log" "$expected_duckdb" "linux should install DuckDB for $manager"
+    assert_log_contains "$log" "$expected_qpdf" "linux should map qpdf for $manager"
+    assert_log_line_count "$log" "$expected_ffmpeg" 1 "ffprobe must not trigger a second FFmpeg install"
+    assert_log_line_count "$log" "$last_expected" 1 "Poppler companions must not trigger extra installs"
     assert_log_contains "$log" "$expected_sqlite" "linux install should map sqlite3 for $manager"
     assert_log_contains "$log" "$expected_delta" "linux install should map git-delta for $manager"
     assert_log_contains "$log" "$expected_file" "linux install should map file for $manager"
@@ -983,6 +1017,12 @@ test_macos_install_missing_uses_brew() {
   assert_log_contains "$log" "brew install uv" "macOS install should map uv to Homebrew"
   assert_log_contains "$log" "brew install pre-commit" "macOS install should map pre-commit to Homebrew"
   assert_log_contains "$log" "brew install ast-grep" "macOS install should map ast-grep to Homebrew"
+  assert_log_contains "$log" "brew install git-lfs" "macOS should install Git LFS"
+  assert_log_contains "$log" "brew install tesseract" "macOS should install Tesseract"
+  assert_log_contains "$log" "brew install duckdb" "macOS should install DuckDB"
+  assert_log_contains "$log" "brew install qpdf" "macOS should install qpdf"
+  assert_log_line_count "$log" "brew install ffmpeg" 1 "ffprobe must not trigger a second FFmpeg install"
+  assert_log_line_count "$log" "brew install poppler" 1 "Poppler companions must not trigger extra installs"
 }
 
 test_macos_reports_uv_managed_pre_commit_source() {
@@ -1157,6 +1197,123 @@ test_macos_upgrade_managed_uses_homebrew_owner() {
   assert_log_not_contains "$log" "brew install fd" "macOS upgrade should not install missing tools"
 }
 
+test_new_tools_and_companion_versions() {
+  local platform dir bin output name flag banner
+  for platform in linux macos; do
+    dir="$(new_case_dir "$platform-new-tool-versions")"
+    bin="$dir/bin"
+    output="$dir/output.txt"
+    add_common_shell_utilities "$bin"
+    while IFS='|' read -r name flag banner; do
+      write_executable "$bin/$name" \
+        "[ \"\$*\" = '$flag' ] || exit 2" \
+        "printf '%s\n' '$banner' >&2"
+    done <<'EOF'
+git-lfs|--version|git-lfs/3.8.0 (GitHub; linux amd64; go 1.26.0)
+tesseract|--version|tesseract 5.5.3
+duckdb|--version|v1.5.6 (Variegata) 0123456789
+qpdf|--version|qpdf version 12.4.2
+ffprobe|-version|ffprobe version 8.0 Copyright the FFmpeg developers
+pdfinfo|-v|pdfinfo version 25.12.0
+pdftoppm|-v|pdftoppm version 25.12.0
+pdftocairo|-v|pdftocairo version 25.12.0
+pdfimages|-v|pdfimages version 25.12.0
+EOF
+    run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/$platform.sh"
+    for name in git-lfs tesseract duckdb qpdf ffprobe pdfinfo pdftoppm pdftocairo pdfimages; do
+      assert_contains "$output" "[found]   $name" "$platform should report $name"
+    done
+    assert_matches "$output" '\[found\].*git-lfs.*3\.8\.0$' "$platform should parse Git LFS versions"
+    assert_matches "$output" '\[found\].*duckdb.*v1\.5\.6$' "$platform should parse DuckDB versions"
+    assert_not_contains "$output" "Version checks failed:" "$platform should use the correct version flags"
+    assert_not_contains "$output" "Missing companion commands:" "$platform should find all companions"
+  done
+}
+
+test_companions_preserve_existing_providers() {
+  local platform dir bin log output name
+  for platform in linux macos; do
+    dir="$(new_case_dir "$platform-companion-preservation")"
+    bin="$dir/bin"
+    log="$dir/commands.log"
+    output="$dir/output.txt"
+    add_common_shell_utilities "$bin"
+    add_fake_github_release_installers "$bin"
+    add_fake_tool "$bin" ffmpeg
+    add_fake_tool "$bin" pdftotext
+    if [ "$platform" = linux ]; then
+      add_fake_linux_manager "$bin" apt
+    else
+      add_fake_brew "$bin"
+    fi
+    FAKE_BREW_PREFIX="$dir/homebrew" FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/$platform.sh" --install-missing
+    assert_contains "$output" "Missing companion commands: 5" "$platform should count missing companions separately"
+    assert_contains "$output" "companion of pdftotext" "$platform should explain the Poppler provider"
+    assert_log_not_contains "$log" "install ffmpeg" "$platform must preserve a custom FFmpeg installation"
+    assert_log_not_contains "$log" "install poppler" "$platform must preserve a custom Poppler installation"
+    assert_log_not_contains "$log" "install -y ffmpeg" "$platform must preserve a custom FFmpeg installation"
+    assert_log_not_contains "$log" "install -y poppler" "$platform must preserve a custom Poppler installation"
+    assert_log_not_contains "$log" "lfs install" "tool detection must not initialize Git LFS configuration"
+
+    # Once the shared package owns its commands, only its provider row upgrades.
+    for name in pdftotext pdfinfo pdftoppm pdftocairo pdfimages; do
+      if [ "$platform" = macos ]; then
+        mkdir -p "$dir/homebrew/Cellar/poppler/1.0/bin"
+        add_fake_tool "$dir/homebrew/Cellar/poppler/1.0/bin" "$name"
+      else
+        add_fake_tool "$bin" "$name"
+      fi
+    done
+    rm "$bin/ffmpeg"
+    if [ "$platform" = linux ]; then
+      add_fake_dpkg_owner "$bin" poppler-utils
+      # The release fixtures themselves are not managed Poppler commands.
+      rm "$bin/curl" "$bin/tar" "$bin/unzip" "$bin/uv"
+    fi
+    : > "$log"
+    FAKE_BREW_PREFIX="$dir/homebrew" FAKE_COMMAND_LOG="$log" run_with_path "$output" "$dir/homebrew/Cellar/poppler/1.0/bin:$bin" /bin/bash "$ROOT_DIR/$platform.sh" --upgrade-managed
+    if [ "$platform" = linux ]; then
+      assert_log_line_count "$log" "apt-get install --only-upgrade -y poppler-utils" 1 "linux should upgrade Poppler only once"
+    else
+      assert_log_line_count "$log" "brew upgrade poppler" 1 "macOS should upgrade Poppler only once"
+    fi
+  done
+}
+
+test_duckdb_release_verification() {
+  local arch mode dir bin log output script status
+  for arch in x86_64 aarch64; do
+    for mode in success checksum missing-digest extract missing-binary; do
+      dir="$(new_case_dir "duckdb-$arch-$mode")"
+      bin="$dir/bin"
+      log="$dir/commands.log"
+      output="$dir/output.txt"
+      script="$dir/install-duckdb.sh"
+      add_common_shell_utilities "$bin"
+      add_fake_github_release_installers "$bin"
+      rm "$bin/uname"
+      write_executable "$bin/uname" "printf '%s\n' '$arch'"
+      write_executable "$bin/sha256sum" \
+        'read -r digest asset' \
+        'printf "verify %s %s\n" "$digest" "$asset" >> "$FAKE_COMMAND_LOG"' \
+        '[ "${FAKE_DUCKDB_FAILURE:-}" != "checksum" ]'
+      # Exercise the release installer without installing unrelated tools.
+      sed '/^missing_count=0/,$d' "$ROOT_DIR/linux.sh" > "$script"
+      printf '\ninstall_duckdb_release\n' >> "$script"
+      status=0
+      FAKE_DUCKDB_FAILURE="$mode" FAKE_COMMAND_LOG="$log" PATH="$bin" /bin/bash "$script" > "$output" 2>&1 || status=$?
+      if [ "$mode" = success ]; then
+        [ "$status" -eq 0 ] || fail "DuckDB $arch install should succeed"
+        assert_log_contains "$log" "verify aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa duckdb_cli-linux-" "DuckDB should verify its release digest"
+        assert_log_contains "$log" "install -m 0755 duckdb /usr/local/bin/duckdb" "DuckDB should install the CLI"
+      else
+        [ "$status" -ne 0 ] || fail "DuckDB should fail for $mode"
+        assert_log_not_contains "$log" "install -m 0755 duckdb" "DuckDB must not install an unverified or missing executable"
+      fi
+    done
+  done
+}
+
 run_test() {
   local name="$1"
   shift
@@ -1191,3 +1348,6 @@ run_test "macOS formats display paths" test_macos_formats_display_paths
 run_test "macOS upgrade-managed skips nvm" test_macos_upgrade_managed_skips_nvm
 run_test "macOS reports uv-managed pre-commit source" test_macos_reports_uv_managed_pre_commit_source
 run_test "macOS upgrade-managed uses Homebrew owner" test_macos_upgrade_managed_uses_homebrew_owner
+run_test "new tools and companions report versions" test_new_tools_and_companion_versions
+run_test "companions preserve existing providers" test_companions_preserve_existing_providers
+run_test "DuckDB release verification fails closed" test_duckdb_release_verification

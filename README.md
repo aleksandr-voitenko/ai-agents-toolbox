@@ -30,6 +30,7 @@ support:
 
 ### Structured data and files
 
+- `duckdb` - SQL command-line client for querying CSV, JSON, and Parquet data.
 - `file` - File type detector based on content signatures.
 - `jq` - Command-line JSON processor for querying and transforming structured data.
 - `sqlite3` - Command-line shell for inspecting and managing SQLite databases.
@@ -39,6 +40,7 @@ support:
 
 - `gh` - GitHub CLI for repository, pull request, issue, and workflow operations.
 - `git` - Distributed version control CLI.
+- `git-lfs` - Git extension for retrieving and versioning large repository assets.
 
 ### Diffing and code review
 
@@ -72,6 +74,22 @@ support:
 - `imagemagick` (`magick`/`convert`) - Image inspection and conversion toolkit.
 - `pandoc` - Universal document converter for markup and publishing workflows.
 - `pdftotext` - PDF text extraction tool from Poppler.
+- `qpdf` - PDF structural inspection, validation, and page manipulation toolkit.
+- `tesseract` - OCR engine for extracting text from images and scanned pages.
+
+The report also checks these companion commands supplied by existing packages:
+
+- `ffprobe` - Media stream inspection from FFmpeg.
+- `pdfinfo` - PDF metadata and page information from Poppler.
+- `pdftoppm` - PDF page rendering to images from Poppler.
+- `pdftocairo` - PDF rendering and conversion through Cairo from Poppler.
+- `pdfimages` - Embedded image extraction from Poppler.
+
+Companions are checked after their provider entries. Their installation and
+upgrades stay with `ffmpeg` or `pdftotext`, so a missing companion never causes
+an existing provider installation to be replaced or its package to be upgraded
+again. Missing companions are counted separately in the summary; check the
+provider installation and PATH if any remain unavailable.
 
 ### Shell, archive, and system utilities
 
@@ -110,6 +128,23 @@ Linux, those narrow fallbacks install upstream release assets for tools such as
 `uv` and `ast-grep`, and openSUSE uses the newly installed `uv` to install
 `pre-commit` when zypper has no native package.
 
+DuckDB uses the native `duckdb` package on Arch and Homebrew, and official
+GitHub CLI releases on apt, dnf, and zypper for Linux x86-64 and ARM64. The
+Linux release installer verifies the GitHub SHA256 digest when `sha256sum` is
+available and leaves future upgrades of that binary unmanaged.
+
+Tesseract is packaged as `tesseract-ocr` on apt and zypper, and `tesseract` on
+the other supported managers. OCR also needs language data: run
+`tesseract --list-langs` to see what is available. Package defaults vary;
+install the language data needed for your documents through your package
+manager. Scoop provides it separately as `tesseract-languages`, while Homebrew
+provides additional languages through `tesseract-lang`. The toolbox checks the
+engine's presence and version; it does not download additional language packs.
+
+The toolbox does not invoke `git lfs install` itself; package managers may
+perform their own setup. Follow the [Git LFS setup instructions](https://git-lfs.com/)
+when enabling it for your user account or repository.
+
 Some tools are intentionally platform-specific. `rsync` is managed on Linux and
 macOS, but is not a Windows requirement. Windows additionally manages `pwsh`
 through winget's `Microsoft.PowerShell` package; Linux and macOS do not require
@@ -119,6 +154,11 @@ On Windows, `pre-commit` is installed with `uv tool install` when `uv` and
 Python are available, and uv-managed `pre-commit` commands are reported with
 `uv:pre-commit` as their source. `ast-grep` has winget and Scoop mappings but no
 verified Chocolatey package.
+
+Git LFS and DuckDB have WinGet, Scoop, and Chocolatey mappings. Tesseract and
+qpdf use Scoop or Chocolatey because their upstream Windows installers used by
+WinGet do not add their executables to PATH during unattended installation.
+Existing commands on PATH are detected regardless of their installation source.
 
 Machine-wide Chocolatey installs are skipped in auto install mode when the
 current shell is not elevated, because they normally write under `C:\ProgramData\chocolatey`.

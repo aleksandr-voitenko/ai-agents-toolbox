@@ -70,6 +70,7 @@ typos|typos|github-release:typos|github-release:typos|typos|github-release:typos
 clang-format|clang-format|clang-format|clang-tools-extra|clang|clang-tools
 gh|gh|gh|gh|github-cli|gh
 git|git|git|git|git|git
+git-lfs|git-lfs|git-lfs|git-lfs|git-lfs|git-lfs
 git-delta|delta|git-delta|git-delta|git-delta|git-delta
 just|just|just|just|just|just
 difftastic|difft|github-release:difftastic|difftastic|difftastic|difftastic
@@ -103,6 +104,14 @@ pre-commit|pre-commit|pre-commit|pre-commit|pre-commit|uv-tool:pre-commit
 ast-grep|ast-grep|github-release:ast-grep|github-release:ast-grep|ast-grep|github-release:ast-grep
 ghostscript|gs|ghostscript|ghostscript|ghostscript|ghostscript
 pdftotext|pdftotext|poppler-utils|poppler-utils|poppler|poppler-tools
+duckdb|duckdb|github-release:duckdb|github-release:duckdb|duckdb|github-release:duckdb
+tesseract|tesseract|tesseract-ocr|tesseract|tesseract|tesseract-ocr
+qpdf|qpdf|qpdf|qpdf|qpdf|qpdf
+ffprobe|ffprobe|ffmpeg|ffmpeg-free|ffmpeg|ffmpeg-8|ffmpeg
+pdfinfo|pdfinfo|poppler-utils|poppler-utils|poppler|poppler-tools|pdftotext
+pdftoppm|pdftoppm|poppler-utils|poppler-utils|poppler|poppler-tools|pdftotext
+pdftocairo|pdftocairo|poppler-utils|poppler-utils|poppler|poppler-tools|pdftotext
+pdfimages|pdfimages|poppler-utils|poppler-utils|poppler|poppler-tools|pdftotext
 EOF
 )
 
@@ -297,7 +306,7 @@ version_for() {
     gs)
       version_output "$command_name" --version
       ;;
-    pdftotext)
+    pdftotext|pdfinfo|pdftoppm|pdftocairo|pdfimages)
       version_output "$command_name" -v
       ;;
     7z|7zz)
@@ -309,7 +318,7 @@ version_for() {
     shfmt)
       version_output "$command_name" -version
       ;;
-    ffmpeg)
+    ffmpeg|ffprobe)
       version_output "$command_name" -version
       ;;
     exiftool)
@@ -869,6 +878,50 @@ install_ast_grep_release() {
   return "$status"
 }
 
+install_duckdb_release() {
+  local arch asset_name asset_url asset_digest tmp_dir status
+  case "$(uname -m)" in
+    x86_64|amd64) arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *)
+      echo "Unsupported DuckDB release architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+
+  asset_name="duckdb_cli-linux-${arch}.zip"
+  tmp_dir="$(mktemp -d)" || return 1
+  status=0
+  (
+    cd "$tmp_dir" || exit 1
+    download_to_stdout "https://api.github.com/repos/duckdb/duckdb/releases/latest" > release.json || exit 1
+    asset_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_url" ]; then
+      echo "Could not find a DuckDB Linux $arch release asset." >&2
+      exit 1
+    fi
+    asset_digest="$(sed -n "/\"name\":[[:space:]]*\"$asset_name\"/,/\"browser_download_url\"/s#.*\"digest\":[[:space:]]*\"sha256:\\([a-f0-9]*\\)\".*#\\1#p" release.json | head -n 1)"
+    download_to_stdout "$asset_url" > "$asset_name" || exit 1
+    if have sha256sum; then
+      if [ -z "$asset_digest" ]; then
+        echo "Could not find a GitHub SHA256 digest for $asset_name." >&2
+        exit 1
+      fi
+      printf '%s  %s\n' "$asset_digest" "$asset_name" | sha256sum -c - || exit 1
+    else
+      echo "sha256sum was not found; skipping DuckDB checksum verification." >&2
+    fi
+    unzip -q "$asset_name" duckdb || exit 1
+    if [ ! -f duckdb ]; then
+      echo "Could not find duckdb in $asset_name." >&2
+      exit 1
+    fi
+    run_elevated install -m 0755 duckdb /usr/local/bin/duckdb || exit 1
+  ) || status=$?
+  rm -rf "$tmp_dir"
+  return "$status"
+}
+
 install_pre_commit_uv_tool() {
   if ! have uv; then
     echo "uv is required to install pre-commit with the uv tool fallback." >&2
@@ -913,6 +966,9 @@ install_github_release_tool() {
       ;;
     github-release:ast-grep)
       install_ast_grep_release
+      ;;
+    github-release:duckdb)
+      install_duckdb_release
       ;;
     *)
       echo "Unsupported GitHub release installer: $package" >&2
@@ -979,6 +1035,7 @@ MSG
 }
 
 missing_count=0
+missing_companion_count=0
 unmanaged_count=0
 failed_version_count=0
 
@@ -990,12 +1047,19 @@ else
 fi
 echo
 
-while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
+# Companion rows follow their providers so newly installed commands can be
+# checked without reinstalling or upgrading a shared package independently.
+while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg companion_of; do
   [ -z "$name" ] && continue
 
   command_path="$(find_command "$commands" || true)"
 
   if [ -z "$command_path" ]; then
+    if [ -n "$companion_of" ]; then
+      missing_companion_count=$((missing_companion_count + 1))
+      printf '[missing] %-14s companion of %s\n' "$name" "$companion_of"
+      continue
+    fi
     missing_count=$((missing_count + 1))
     printf '[missing] %-14s' "$name"
 
@@ -1043,6 +1107,8 @@ while IFS='|' read -r name commands apt_pkg dnf_pkg pacman_pkg zypper_pkg; do
   path_display="$(path_for_display "$command_path")"
   printf '[found]   %-14s %-48s %-22s %s\n' "$name" "$path_display" "$source" "$version_display"
 
+  [ -n "$companion_of" ] && continue
+
   case "$source" in
     apt:*|rpm:*|pacman:*)
       if [ "$UPGRADE_MANAGED" -eq 1 ]; then
@@ -1065,6 +1131,10 @@ fi
 echo
 echo "Summary:"
 echo "  Missing packages: $missing_count"
+if [ "$missing_companion_count" -gt 0 ]; then
+  echo "  Missing companion commands: $missing_companion_count"
+  echo "  Check the listed provider installation and PATH for missing companions."
+fi
 if [ "$failed_version_count" -gt 0 ]; then
   echo "  Version checks failed:  $failed_version_count"
 fi
