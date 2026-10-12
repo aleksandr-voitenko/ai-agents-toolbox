@@ -73,7 +73,10 @@ This conservative stance is the main project invariant.
   `CompanionOf` property make them check-only: package actions stay with FFmpeg
   or Poppler's `pdftotext` entry. Missing companions have a separate summary
   count, and real install smoke checks reject missing companions. This avoids
-  replacing custom providers or repeating shared-package upgrades.
+  replacing custom providers or repeating shared-package upgrades. Both Windows
+  install-smoke paths provision full Poppler with Chocolatey first because the
+  hosted runner's Git-bundled `pdftotext` lacks the companion commands and is
+  intentionally preserved by the toolbox.
 - The setup scripts do not invoke `git lfs install` themselves; package
   managers may perform their own Git LFS setup.
 - Platform-specific tools are allowed. `rsync` is managed on Linux and macOS

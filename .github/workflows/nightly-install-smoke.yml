@@ -68,6 +68,16 @@ jobs:
     if: github.event_name == 'schedule'
     runs-on: windows-latest
     steps:
+      - name: Provision Poppler for companion checks
+        shell: pwsh
+        run: |
+          # Git's bundled pdftotext lacks the Poppler companions. The toolbox
+          # preserves existing providers, so prepare the full package in CI.
+          choco install poppler -y --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            throw "Poppler provisioning failed with Chocolatey exit code $LASTEXITCODE."
+          }
+
       - name: Run Windows PowerShell URL bootstrap
         shell: pwsh
         run: |
@@ -178,6 +188,16 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Provision Poppler for companion checks
+        shell: pwsh
+        run: |
+          # Git's bundled pdftotext lacks the Poppler companions. The toolbox
+          # preserves existing providers, so prepare the full package in CI.
+          choco install poppler -y --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            throw "Poppler provisioning failed with Chocolatey exit code $LASTEXITCODE."
+          }
 
       - name: Install missing tools with Chocolatey
         shell: pwsh

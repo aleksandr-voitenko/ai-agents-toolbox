@@ -381,6 +381,10 @@ its nightly schedule, but omits the live `zypper` container because Tumbleweed
 package retrieval is too unstable for unattended checks. Hermetic fake-manager
 tests still exercise `zypper` behavior without depending on live repositories.
 
+Both Windows install-smoke paths provision Poppler before running the toolbox
+so its companion commands are available even when the runner already has Git's
+bundled `pdftotext`.
+
 Run the hermetic tests locally with:
 
 ```sh
