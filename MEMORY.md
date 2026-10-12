@@ -41,9 +41,10 @@ This conservative stance is the main project invariant.
   exceptions are missing `actionlint` and `typos` when apt, dnf, or zypper has
   no verified native package, missing `difftastic` on apt where Ubuntu's
   default repositories have no native package, missing `uv` on apt or zypper,
-  and missing `ast-grep` on apt, dnf, or zypper. The script downloads the
-  official GitHub release, verifies a checksum or release-asset digest when
-  `sha256sum` is available, and exposes the command from `/usr/local/bin`
+  and missing `ast-grep` or `duckdb` on apt, dnf, or zypper. DuckDB's release
+  fallback supports x86-64/ARM64; pacman uses its native `duckdb` package.
+  The script downloads the official GitHub release, verifies a checksum or
+  release-asset digest when `sha256sum` is available, and exposes the command from `/usr/local/bin`
   without taking over future managed upgrades. Missing `pre-commit` on zypper
   uses the newly installed `uv` tool manager with `/usr/local/share/uv/tools`
   and `/usr/local/bin` so openSUSE does not depend on an unavailable native
@@ -62,6 +63,22 @@ This conservative stance is the main project invariant.
   and uv-managed commands should report `uv:pre-commit` when uv tool metadata
   and the command path agree. `ast-grep` has winget/Scoop mappings but no
   verified Chocolatey mapping.
+- Git LFS and DuckDB have mappings for all three Windows managers. Tesseract
+  and qpdf use Scoop/Chocolatey only: their upstream WinGet installers do not
+  put their executables on PATH in unattended mode. Linux maps the OCR engine
+  to `tesseract-ocr` on apt/zypper and `tesseract` on dnf/pacman. Language data remains a separate
+  user choice; the toolbox checks engine availability, not OCR readiness.
+- Companion rows (`ffprobe`, `pdfinfo`, `pdftoppm`, `pdftocairo`, `pdfimages`)
+  follow all provider rows. The optional last shell-manifest column and Windows
+  `CompanionOf` property make them check-only: package actions stay with FFmpeg
+  or Poppler's `pdftotext` entry. Missing companions have a separate summary
+  count, and real install smoke checks reject missing companions. This avoids
+  replacing custom providers or repeating shared-package upgrades. Both Windows
+  install-smoke paths provision full Poppler with Chocolatey first because the
+  hosted runner's Git-bundled `pdftotext` lacks the companion commands and is
+  intentionally preserved by the toolbox.
+- The setup scripts do not invoke `git lfs install` themselves; package
+  managers may perform their own Git LFS setup.
 - Platform-specific tools are allowed. `rsync` is managed on Linux and macOS
   only, not on Windows. Windows additionally manages `pwsh` through winget's
   `Microsoft.PowerShell` package; Linux and macOS do not require it.

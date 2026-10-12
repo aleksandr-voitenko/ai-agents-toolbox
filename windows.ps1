@@ -45,6 +45,7 @@ $Tools = @(
   @{ Name = "clang-format"; Commands = @("clang-format.exe", "clang-format"); Winget = "LLVM.LLVM"; Scoop = "llvm"; Choco = "llvm" },
   @{ Name = "gh"; Commands = @("gh.exe", "gh"); Winget = "GitHub.cli"; Scoop = "gh"; Choco = "gh" },
   @{ Name = "git"; Commands = @("git.exe", "git"); Winget = "Git.Git"; Scoop = "git"; Choco = "git" },
+  @{ Name = "git-lfs"; Commands = @("git-lfs.exe", "git-lfs"); Winget = "GitHub.GitLFS"; Scoop = "git-lfs"; Choco = "git-lfs" },
   @{ Name = "git-delta"; Commands = @("delta.exe", "delta"); Winget = $null; Scoop = "delta"; Choco = "delta" },
   @{ Name = "just"; Commands = @("just.exe", "just"); Winget = "Casey.Just"; Scoop = "just"; Choco = "just" },
   @{ Name = "difftastic"; Commands = @("difft.exe", "difft"); Winget = "Wilfred.difftastic"; Scoop = "difftastic"; Choco = "difftastic" },
@@ -77,7 +78,19 @@ $Tools = @(
   @{ Name = "pre-commit"; Commands = @("pre-commit.exe", "pre-commit"); Winget = $null; Scoop = $null; Choco = $null; UvTool = "pre-commit" },
   @{ Name = "ast-grep"; Commands = @("ast-grep.exe", "ast-grep"); Winget = "ast-grep.ast-grep"; Scoop = "ast-grep"; Choco = $null },
   @{ Name = "ghostscript"; Commands = @("gswin64c.exe", "gswin32c.exe", "gs.exe", "gs"); Winget = $null; Scoop = "ghostscript"; Choco = "ghostscript" },
-  @{ Name = "pdftotext"; Commands = @("pdftotext.exe", "pdftotext"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler" }
+  @{ Name = "pdftotext"; Commands = @("pdftotext.exe", "pdftotext"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler" },
+  @{ Name = "duckdb"; Commands = @("duckdb.exe", "duckdb"); Winget = "DuckDB.cli"; Scoop = "duckdb"; Choco = "duckdb" },
+  # The upstream installer used by WinGet does not expose tesseract on PATH.
+  @{ Name = "tesseract"; Commands = @("tesseract.exe", "tesseract"); Winget = $null; Scoop = "tesseract"; Choco = "tesseract" },
+  # qpdf's WinGet installer also leaves PATH unchanged in silent mode.
+  @{ Name = "qpdf"; Commands = @("qpdf.exe", "qpdf"); Winget = $null; Scoop = "qpdf"; Choco = "qpdf" },
+  # Check companions after provider installs and PATH refreshes. Their shared
+  # packages remain managed solely through the provider entries above.
+  @{ Name = "ffprobe"; Commands = @("ffprobe.exe", "ffprobe"); Winget = "Gyan.FFmpeg"; Scoop = "ffmpeg"; Choco = "ffmpeg"; CompanionOf = "ffmpeg" },
+  @{ Name = "pdfinfo"; Commands = @("pdfinfo.exe", "pdfinfo"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler"; CompanionOf = "pdftotext" },
+  @{ Name = "pdftoppm"; Commands = @("pdftoppm.exe", "pdftoppm"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler"; CompanionOf = "pdftotext" },
+  @{ Name = "pdftocairo"; Commands = @("pdftocairo.exe", "pdftocairo"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler"; CompanionOf = "pdftotext" },
+  @{ Name = "pdfimages"; Commands = @("pdfimages.exe", "pdfimages"); Winget = "oschwartz10612.Poppler"; Scoop = "poppler"; Choco = "poppler"; CompanionOf = "pdftotext" }
 )
 
 function Test-CommandExists {
@@ -461,7 +474,7 @@ function Get-VersionArguments {
   if ($baseName -like "gswin*c" -or $baseName -eq "gs") {
     return @("--version")
   }
-  if ($baseName -eq "pdftotext") {
+  if ($baseName -in @("pdftotext", "pdfinfo", "pdftoppm", "pdftocairo", "pdfimages")) {
     return @("-v")
   }
   if ($baseName -eq "7z" -or $baseName -eq "7zz") {
@@ -470,7 +483,7 @@ function Get-VersionArguments {
   if ($baseName -eq "zip" -or $baseName -eq "unzip") {
     return @("-v")
   }
-  if ($baseName -eq "ffmpeg") {
+  if ($baseName -in @("ffmpeg", "ffprobe")) {
     return @("-version")
   }
   if ($baseName -eq "exiftool") {
@@ -971,6 +984,7 @@ if ($availableManagers.Count -gt 0) {
 Write-Host ""
 
 $missingCount = 0
+$missingCompanionCount = 0
 $unmanagedCount = 0
 $failedVersionCount = 0
 $installAttemptCount = 0
@@ -986,6 +1000,11 @@ foreach ($tool in $Tools) {
   $cmd = Get-ToolCommand $tool.Commands $tool
 
   if ($null -eq $cmd) {
+    if ($tool.CompanionOf) {
+      $missingCompanionCount++
+      Write-Host ("[missing] {0,-14} companion of {1}" -f $tool.Name, $tool.CompanionOf)
+      continue
+    }
     $missingCount++
     $installManager = Get-InstallManager $tool
 
@@ -1066,7 +1085,7 @@ foreach ($tool in $Tools) {
   $pathDisplay = Format-PathForDisplay $cmd.Source
   Write-Host ("[found]   {0,-14} {1,-$PathDisplayWidth} {2,-$SourceDisplayWidth} {3}" -f $tool.Name, $pathDisplay, $source, $versionDisplay)
 
-  if ($UpgradeManaged) {
+  if ($UpgradeManaged -and -not $tool.CompanionOf) {
     if ($source -like "winget:*" -or $source -like "scoop:*" -or $source -like "choco:*") {
       $didUpgrade = Upgrade-ManagedTool $source
       if (-not $didUpgrade) {
@@ -1087,6 +1106,10 @@ if ($InstallMissing -and $missingCount -gt 0 -and $availableManagers.Count -eq 0
 Write-Host ""
 Write-Host "Summary:"
 Write-Host "  Missing packages: $missingCount"
+if ($missingCompanionCount -gt 0) {
+  Write-Host "  Missing companion commands: $missingCompanionCount"
+  Write-Host "  Check the listed provider installation and PATH for missing companions."
+}
 if ($failedVersionCount -gt 0) {
   Write-Host "  Version checks failed:  $failedVersionCount"
 }
