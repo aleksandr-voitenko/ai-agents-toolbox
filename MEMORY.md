@@ -43,6 +43,8 @@ This conservative stance is the main project invariant.
   default repositories have no native package, missing `uv` on apt or zypper,
   and missing `ast-grep` or `duckdb` on apt, dnf, or zypper. DuckDB's release
   fallback supports x86-64/ARM64; pacman uses its native `duckdb` package.
+  The DuckDB fallback prefers current CLI tarballs and accepts legacy ZIP
+  releases, with the same digest verification and failure handling for both.
   The script downloads the official GitHub release, verifies a checksum or
   release-asset digest when `sha256sum` is available, and exposes the command from `/usr/local/bin`
   without taking over future managed upgrades. Missing `pre-commit` on zypper

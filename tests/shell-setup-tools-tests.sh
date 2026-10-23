@@ -397,13 +397,27 @@ add_fake_github_release_installers() {
     '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/ast-grep/ast-grep/releases/download/0.44.1/app-aarch64-unknown-linux-gnu.zip\"}"' \
     '    ;;' \
     '  *api.github.com/repos/duckdb/duckdb/releases/latest*)' \
-    '    for arch in amd64 arm64; do' \
-    '      printf "{\"name\":\"duckdb_cli-linux-%s.zip\"}\n" "$arch"' \
+    '    duckdb_asset() {' \
+    '      printf "{\"name\":\"%s\"}\n" "$1"' \
     '      if [ "${FAKE_DUCKDB_FAILURE:-}" != "missing-digest" ]; then' \
-    '        printf "%s\n" "{\"digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}"' \
+    '        printf "{\"digest\":\"sha256:%s\"}\n" "$2"' \
     '      fi' \
-    '      printf "{\"browser_download_url\":\"https://github.com/duckdb/duckdb/releases/download/v1.5.6/duckdb_cli-linux-%s.zip\"}\n" "$arch"' \
+    '      printf "{\"browser_download_url\":\"https://github.com/duckdb/duckdb/releases/download/v2.0.0/%s\"}\n" "$1"' \
+    '    }' \
+    '    for arch in amd64 arm64; do' \
+    '      case "${FAKE_DUCKDB_ARCHIVES:-tar.gz}" in' \
+    '        zip|both) duckdb_asset "duckdb_cli-linux-$arch.zip" bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ;;' \
+    '      esac' \
+    '      duckdb_asset "duckdb-cli-linux-$arch-musl.tar.gz" cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' \
+    '      duckdb_asset "duckdb-shared-libs-linux-$arch.tar.gz" dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' \
+    '      case "${FAKE_DUCKDB_ARCHIVES:-tar.gz}" in' \
+    '        tar.gz|both) duckdb_asset "duckdb-cli-linux-$arch.tar.gz" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ;;' \
+    '      esac' \
     '    done' \
+    '    ;;' \
+    '  *github.com/duckdb/duckdb/releases/download/*)' \
+    '    printf "download %s\n" "$url" >> "$FAKE_COMMAND_LOG"' \
+    '    printf "fake DuckDB archive\n"' \
     '    ;;' \
     '  *uv-*-unknown-linux-gnu.tar.gz.sha256*)' \
     '    asset="${url##*/}"' \
@@ -420,6 +434,13 @@ add_fake_github_release_installers() {
     '  exit 0' \
     'fi' \
     'printf "tar %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    'case "$2" in' \
+    '  duckdb-cli-linux-*.tar.gz)' \
+    '    if [ "${FAKE_DUCKDB_FAILURE:-}" = "extract" ]; then exit 1; fi' \
+    '    if [ "${FAKE_DUCKDB_FAILURE:-}" != "missing-binary" ]; then : > duckdb; fi' \
+    '    exit 0' \
+    '    ;;' \
+    'esac' \
     'mkdir -p uv-x86_64-unknown-linux-gnu' \
     'mkdir -p uv-aarch64-unknown-linux-gnu' \
     'mkdir -p uv-i686-unknown-linux-gnu' \
@@ -439,6 +460,7 @@ add_fake_github_release_installers() {
     '  exit 0' \
     'fi' \
     'printf "unzip %s\n" "$*" >> "$FAKE_COMMAND_LOG"' \
+    'case "$2" in *.zip) ;; *) exit 1 ;; esac' \
     'if [ "${FAKE_DUCKDB_FAILURE:-}" = "extract" ]; then exit 1; fi' \
     'if [ "${FAKE_DUCKDB_FAILURE:-}" != "missing-binary" ]; then : > duckdb; fi' \
     ': > ast-grep' \
@@ -1281,35 +1303,55 @@ test_companions_preserve_existing_providers() {
 }
 
 test_duckdb_release_verification() {
-  local arch mode dir bin log output script status
+  local arch archives mode dir bin log output script status asset_name asset_digest release_arch
   for arch in x86_64 aarch64; do
-    for mode in success checksum missing-digest extract missing-binary; do
-      dir="$(new_case_dir "duckdb-$arch-$mode")"
-      bin="$dir/bin"
-      log="$dir/commands.log"
-      output="$dir/output.txt"
-      script="$dir/install-duckdb.sh"
-      add_common_shell_utilities "$bin"
-      add_fake_github_release_installers "$bin"
-      rm "$bin/uname"
-      write_executable "$bin/uname" "printf '%s\n' '$arch'"
-      write_executable "$bin/sha256sum" \
-        'read -r digest asset' \
-        'printf "verify %s %s\n" "$digest" "$asset" >> "$FAKE_COMMAND_LOG"' \
-        '[ "${FAKE_DUCKDB_FAILURE:-}" != "checksum" ]'
-      # Exercise the release installer without installing unrelated tools.
-      sed '/^missing_count=0/,$d' "$ROOT_DIR/linux.sh" > "$script"
-      printf '\ninstall_duckdb_release\n' >> "$script"
-      status=0
-      FAKE_DUCKDB_FAILURE="$mode" FAKE_COMMAND_LOG="$log" PATH="$bin" /bin/bash "$script" > "$output" 2>&1 || status=$?
-      if [ "$mode" = success ]; then
-        [ "$status" -eq 0 ] || fail "DuckDB $arch install should succeed"
-        assert_log_contains "$log" "verify aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa duckdb_cli-linux-" "DuckDB should verify its release digest"
-        assert_log_contains "$log" "install -m 0755 duckdb /usr/local/bin/duckdb" "DuckDB should install the CLI"
+    case "$arch" in
+      x86_64) release_arch=amd64 ;;
+      aarch64) release_arch=arm64 ;;
+    esac
+    for archives in tar.gz zip both; do
+      if [ "$archives" = zip ]; then
+        asset_name="duckdb_cli-linux-$release_arch.zip"
+        asset_digest=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
       else
-        [ "$status" -ne 0 ] || fail "DuckDB should fail for $mode"
-        assert_log_not_contains "$log" "install -m 0755 duckdb" "DuckDB must not install an unverified or missing executable"
+        asset_name="duckdb-cli-linux-$release_arch.tar.gz"
+        asset_digest=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       fi
+      for mode in success checksum missing-digest extract missing-binary; do
+        dir="$(new_case_dir "duckdb-$arch-$archives-$mode")"
+        bin="$dir/bin"
+        log="$dir/commands.log"
+        output="$dir/output.txt"
+        script="$dir/install-duckdb.sh"
+        add_common_shell_utilities "$bin"
+        add_fake_github_release_installers "$bin"
+        rm "$bin/uname"
+        write_executable "$bin/uname" "printf '%s\n' '$arch'"
+        write_executable "$bin/sha256sum" \
+          'read -r digest asset' \
+          'printf "verify %s %s\n" "$digest" "$asset" >> "$FAKE_COMMAND_LOG"' \
+          '[ "${FAKE_DUCKDB_FAILURE:-}" != "checksum" ]'
+        # Exercise the release installer without installing unrelated tools.
+        sed '/^missing_count=0/,$d' "$ROOT_DIR/linux.sh" > "$script"
+        printf '\ninstall_duckdb_release\n' >> "$script"
+        status=0
+        FAKE_DUCKDB_ARCHIVES="$archives" FAKE_DUCKDB_FAILURE="$mode" FAKE_COMMAND_LOG="$log" PATH="$bin" /bin/bash "$script" > "$output" 2>&1 || status=$?
+        if [ "$mode" = success ]; then
+          if [ "$status" -ne 0 ]; then
+            cat "$output" >&2
+            fail "DuckDB $arch install should succeed with $archives archives"
+          fi
+          assert_log_contains "$log" "download https://github.com/duckdb/duckdb/releases/download/v2.0.0/$asset_name" "DuckDB should select the matching CLI archive, preferring tar.gz"
+          assert_log_contains "$log" "verify $asset_digest $asset_name" "DuckDB should verify the selected asset's digest"
+          assert_log_contains "$log" "install -m 0755 duckdb /usr/local/bin/duckdb" "DuckDB should install the CLI"
+        else
+          [ "$status" -ne 0 ] || fail "DuckDB should fail for $mode with $archives archives"
+          assert_log_not_contains "$log" "install -m 0755 duckdb" "DuckDB must not install an unverified or missing executable"
+        fi
+        if [ "$archives" != zip ]; then
+          assert_log_not_contains "$log" "/duckdb_cli-linux-" "DuckDB must not fall back to ZIP after selecting tar.gz"
+        fi
+      done
     done
   done
 }
