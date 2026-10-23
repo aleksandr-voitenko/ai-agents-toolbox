@@ -889,13 +889,16 @@ install_duckdb_release() {
       ;;
   esac
 
-  asset_name="duckdb_cli-linux-${arch}.zip"
   tmp_dir="$(mktemp -d)" || return 1
   status=0
   (
     cd "$tmp_dir" || exit 1
     download_to_stdout "https://api.github.com/repos/duckdb/duckdb/releases/latest" > release.json || exit 1
-    asset_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\)\".*#\\1#p" release.json | head -n 1)"
+    # DuckDB 2.0 uses tarballs; older releases publish ZIP archives.
+    for asset_name in "duckdb-cli-linux-${arch}.tar.gz" "duckdb_cli-linux-${arch}.zip"; do
+      asset_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\)\".*#\\1#p" release.json | head -n 1)"
+      [ -z "$asset_url" ] || break
+    done
     if [ -z "$asset_url" ]; then
       echo "Could not find a DuckDB Linux $arch release asset." >&2
       exit 1
@@ -911,7 +914,10 @@ install_duckdb_release() {
     else
       echo "sha256sum was not found; skipping DuckDB checksum verification." >&2
     fi
-    unzip -q "$asset_name" duckdb || exit 1
+    case "$asset_name" in
+      *.tar.gz) tar -xzf "$asset_name" duckdb || exit 1 ;;
+      *.zip) unzip -q "$asset_name" duckdb || exit 1 ;;
+    esac
     if [ ! -f duckdb ]; then
       echo "Could not find duckdb in $asset_name." >&2
       exit 1
