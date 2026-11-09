@@ -128,6 +128,14 @@ Linux, those narrow fallbacks install upstream release assets for tools such as
 `uv` and `ast-grep`, and openSUSE uses the newly installed `uv` to install
 `pre-commit` when zypper has no native package.
 
+On DNF systems, missing `shfmt` first uses the native package. If that install
+fails and the command is still absent (as on Fedora 45), the toolbox downloads
+the matching Linux binary from the official `mvdan/sh` GitHub release. This
+fallback requires `sha256sum` and verifies the release asset's SHA256 digest
+before installing to `/usr/local/bin/shfmt`. It supports x86-64, ARM64,
+32-bit x86, and ARMv7. Existing commands are preserved, and downloaded binaries
+remain unmanaged for future upgrades.
+
 DuckDB uses the native `duckdb` package on Arch and Homebrew, and official
 GitHub CLI releases on apt, dnf, and zypper for Linux x86-64 and ARM64. The
 Linux release installer verifies the GitHub SHA256 digest when `sha256sum` is

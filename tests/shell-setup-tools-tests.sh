@@ -290,6 +290,12 @@ add_fake_linux_manager() {
         "bin_dir='$bin_dir'" \
         "printf '$manager %s\n' \"\$*\" >> \"\$FAKE_COMMAND_LOG\"" \
         'case "$*" in' \
+        '  "install -y shfmt")' \
+        '    if [ "${FAKE_DNF_SHFMT_UNAVAILABLE:-}" = 1 ]; then' \
+        '      printf "No match for argument: shfmt\n" >&2' \
+        '      exit 1' \
+        '    fi' \
+        '    ;;' \
         '  "install -y python3")' \
         '    {' \
         '      printf "#!/bin/sh\n"' \
@@ -353,6 +359,30 @@ add_fake_github_release_installers() {
     '  esac' \
     'done' \
     'case "$url" in' \
+    '  *api.github.com/repos/mvdan/sh/releases/latest*)' \
+    '    printf "metadata shfmt\n" >> "$FAKE_COMMAND_LOG"' \
+    '    [ "${FAKE_SHFMT_FAILURE:-}" != metadata ] || exit 22' \
+    '    for target in darwin_amd64 linux_amd64 linux_arm64 linux_386 linux_arm; do' \
+    '      [ "${FAKE_SHFMT_FAILURE:-}" != missing-asset ] || continue' \
+    '      printf "{\"name\":\"shfmt_v3.14.1_%s\"}\n" "$target"' \
+    '      if [ "${FAKE_SHFMT_FAILURE:-}" != missing-digest ]; then' \
+    '        if [ "${FAKE_SHFMT_FAILURE:-}" = malformed-digest ]; then' \
+    '          printf "{\"digest\":\"sha256:bad\"}\n"' \
+    '        else printf "{\"digest\":\"sha256:%s\"}\n" "$FAKE_SHFMT_DIGEST"; fi' \
+    '      fi' \
+    '      if [ "${FAKE_SHFMT_FAILURE:-}" != missing-url ]; then' \
+    '        printf "{\"browser_download_url\":\"https://github.com/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_%s\"}\n" "$target"' \
+    '      fi' \
+    '    done' \
+    '    ;;' \
+    '  *github.com/mvdan/sh/releases/download/*)' \
+    '    printf "download %s\n" "$url" >> "$FAKE_COMMAND_LOG"' \
+    '    [ "${FAKE_SHFMT_FAILURE:-}" != download ] || exit 22' \
+    '    if [ "${FAKE_SHFMT_FAILURE:-}" = checksum ]; then printf "corrupt\n"; else' \
+    '      printf '\''#!/bin/sh\nprintf "v3.14.1\\n"\n'\''' \
+    '    fi' \
+    '    [ "${FAKE_SHFMT_FAILURE:-}" != download-error-with-content ] || exit 22' \
+    '    ;;' \
     '  *api.github.com/repos/rhysd/actionlint/releases/latest*)' \
     '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz\"}"' \
     '    printf "%s\n" "{\"browser_download_url\":\"https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz\"}"' \
@@ -1302,6 +1332,95 @@ test_companions_preserve_existing_providers() {
   done
 }
 
+test_shfmt_dnf_fallback() {
+  local mode dir bin log output name commands rest
+  for mode in native unavailable check-only existing; do
+    dir="$(new_case_dir "shfmt-dnf-$mode")"
+    bin="$dir/bin"
+    log="$dir/commands.log"
+    output="$dir/output.txt"
+    add_common_shell_utilities "$bin"
+    # Keep this integration fixture focused on the one missing package.
+    while IFS='|' read -r name commands rest; do
+      [ "$name" = shfmt ] || add_fake_tool "$bin" "${commands%%,*}"
+    done < <(sed -n '/^ripgrep|/,/^EOF/p' "$ROOT_DIR/linux.sh" | sed '$d')
+    add_fake_linux_manager "$bin" dnf
+    add_fake_github_release_installers "$bin"
+    link_utility "$bin" sha256sum
+    if [ "$mode" = existing ]; then add_fake_tool "$bin" shfmt; fi
+    if [ "$mode" = check-only ]; then
+      FAKE_DNF_SHFMT_UNAVAILABLE=1 FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --manager dnf --check-only
+    else
+      FAKE_DNF_SHFMT_UNAVAILABLE="$([ "$mode" = native ] && echo 0 || echo 1)" \
+        FAKE_SHFMT_DIGEST=20540a54d7eba0799e5e77d04634e913a1aaa35bc05be199112166a7edde4e13 \
+        FAKE_COMMAND_LOG="$log" run_with_path "$output" "$bin" /bin/bash "$ROOT_DIR/linux.sh" --manager dnf --install-missing --upgrade-managed
+    fi
+    if [ "$mode" = unavailable ]; then
+      assert_log_contains "$log" "dnf install -y shfmt" "DNF should try the native package first"
+      assert_log_contains "$log" "/usr/local/bin/shfmt" "DNF should fall back when its package is unavailable"
+      assert_contains "$output" ": OK" "shfmt download must pass real SHA256 verification"
+    else
+      assert_log_not_contains "$log" "metadata shfmt" "native, existing and check-only paths must not download shfmt"
+    fi
+    if [ "$mode" = existing ] || [ "$mode" = check-only ]; then
+      assert_log_not_contains "$log" "dnf install -y shfmt" "existing and check-only paths must not install shfmt"
+    fi
+    if [ "$mode" != check-only ]; then
+      assert_contains "$output" "[found]   qpdf" "installation should continue after shfmt"
+    fi
+  done
+}
+
+test_shfmt_release_verification() {
+  local arch target mode dir bin log output script status
+  for arch in x86_64 aarch64 i686 armv7l unsupported; do
+    case "$arch" in
+      x86_64) target=amd64 ;;
+      aarch64) target=arm64 ;;
+      i686) target=386 ;;
+      armv7l) target=arm ;;
+      unsupported) target=unsupported ;;
+    esac
+    for mode in success metadata missing-asset missing-url missing-digest malformed-digest download download-error-with-content checksum no-sha256sum install; do
+      dir="$(new_case_dir "shfmt-$arch-$mode")"
+      bin="$dir/bin"
+      log="$dir/commands.log"
+      output="$dir/output.txt"
+      script="$dir/install-shfmt.sh"
+      add_common_shell_utilities "$bin"
+      add_fake_github_release_installers "$bin"
+      rm "$bin/uname"
+      write_executable "$bin/uname" "printf '%s\n' '$arch'"
+      if [ "$mode" != no-sha256sum ]; then link_utility "$bin" sha256sum; fi
+      if [ "$mode" = install ]; then
+        write_executable "$bin/install" 'exit 42'
+      fi
+      sed '/^missing_count=0/,$d' "$ROOT_DIR/linux.sh" > "$script"
+      printf '\ninstall_github_release_tool github-release:shfmt\n' >> "$script"
+      status=0
+      FAKE_SHFMT_FAILURE="$mode" \
+        FAKE_SHFMT_DIGEST=20540a54d7eba0799e5e77d04634e913a1aaa35bc05be199112166a7edde4e13 \
+        FAKE_COMMAND_LOG="$log" TMPDIR="$dir" PATH="$bin" /bin/bash "$script" > "$output" 2>&1 || status=$?
+      if [ "$mode" = success ] && [ "$arch" != unsupported ]; then
+        [ "$status" -eq 0 ] || { cat "$output" >&2; fail "shfmt $arch install should succeed"; }
+        assert_log_contains "$log" "download https://github.com/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_linux_$target" "shfmt must select the matching Linux binary"
+        assert_contains "$output" ": OK" "shfmt must verify the real digest"
+        assert_log_contains "$log" "install -m 0755 shfmt_v3.14.1_linux_$target /usr/local/bin/shfmt" "shfmt must install the verified binary"
+      else
+        [ "$status" -ne 0 ] || fail "shfmt must reject $arch $mode"
+        assert_log_not_contains "$log" "/usr/local/bin/shfmt" "shfmt must not install an unverified binary"
+      fi
+      if [ "$mode" = install ] && [ "$arch" != unsupported ]; then
+        [ "$status" -eq 42 ] || fail "shfmt must preserve installation failures"
+      fi
+      if [ "$arch" = unsupported ]; then
+        assert_log_not_contains "$log" "metadata shfmt" "unsupported architectures must fail before downloading"
+      fi
+      [ -z "$(compgen -G "$dir/tmp.*" || true)" ] || fail "shfmt must clean temporary files"
+    done
+  done
+}
+
 test_duckdb_release_verification() {
   local arch archives mode dir bin log output script status asset_name asset_digest release_arch
   for arch in x86_64 aarch64; do
@@ -1367,6 +1486,8 @@ run_test() {
 run_test "linux check-only does not install" test_linux_check_only_does_not_install
 run_test "linux summary prints nonzero version failures" test_linux_summary_prints_failed_version_count_when_nonzero
 run_test "linux install-missing uses selected managers" test_linux_install_missing_uses_selected_managers
+run_test "DNF shfmt falls back only for missing commands after native install failure" test_shfmt_dnf_fallback
+run_test "shfmt release verification fails closed" test_shfmt_release_verification
 run_test "linux zypper rebuilds metadata after install failure" test_linux_zypper_rebuilds_metadata_after_install_failure
 run_test "linux GitHub release downloads use token" test_linux_github_release_downloads_use_token_when_available
 run_test "linux empty successful version output is not a failure" test_linux_empty_successful_version_output_is_not_a_failure
