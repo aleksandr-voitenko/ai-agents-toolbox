@@ -507,7 +507,18 @@ install_package() {
       run_package_command apt-get install -y "$package"
       ;;
     dnf)
-      run_package_command dnf install -y "$package"
+      if [ "$package" = shfmt ]; then
+        if run_package_command dnf install -y "$package"; then
+          return 0
+        fi
+        # Fedora 45 no longer provides shfmt. Preserve native installs where
+        # available, and never replace a command left by a failed transaction.
+        if have shfmt; then return 0; fi
+        echo "dnf could not install shfmt; trying the upstream GitHub release."
+        install_github_release_tool github-release:shfmt
+      else
+        run_package_command dnf install -y "$package"
+      fi
       ;;
     pacman)
       run_package_command pacman -S --needed --noconfirm "$package"
@@ -540,16 +551,16 @@ download_to_stdout() {
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "$url"
-          return 0
+          return $?
           ;;
       esac
     fi
     curl -fsSL "$url"
-    return 0
+    return $?
   fi
   if have wget; then
     wget -qO- "$url"
-    return 0
+    return $?
   fi
 
   echo "curl or wget is required to download $url" >&2
@@ -928,6 +939,50 @@ install_duckdb_release() {
   return "$status"
 }
 
+install_shfmt_release() {
+  local arch asset_name asset_url asset_digest tmp_dir status
+  case "$(uname -m)" in
+    x86_64|amd64) arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    i386|i686) arch=386 ;;
+    armv7l|armv7) arch=arm ;;
+    *)
+      echo "Unsupported shfmt release architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+  if ! have sha256sum; then
+    echo "sha256sum is required to verify the shfmt release." >&2
+    return 1
+  fi
+  tmp_dir="$(mktemp -d)" || return 1
+  status=0
+  (
+    cd "$tmp_dir" || exit 1
+    download_to_stdout https://api.github.com/repos/mvdan/sh/releases/latest > release.json || exit 1
+    asset_name="$(sed -n "s#.*\"name\":[[:space:]]*\"\\(shfmt_v[^\"]*_linux_${arch}\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_name" ]; then
+      echo "Could not find a shfmt Linux $arch release asset." >&2
+      exit 1
+    fi
+    asset_url="$(sed -n "s#.*\"browser_download_url\":[[:space:]]*\"\\([^\"]*/${asset_name}\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ -z "$asset_url" ]; then
+      echo "Could not find a download URL for $asset_name." >&2
+      exit 1
+    fi
+    asset_digest="$(sed -n "/\"name\":[[:space:]]*\"$asset_name\"/,/\"browser_download_url\"/s#.*\"digest\":[[:space:]]*\"sha256:\\([a-f0-9]*\\)\".*#\\1#p" release.json | head -n 1)"
+    if [ "${#asset_digest}" -ne 64 ]; then
+      echo "Could not find a GitHub SHA256 digest for $asset_name." >&2
+      exit 1
+    fi
+    download_to_stdout "$asset_url" > "$asset_name" || exit 1
+    printf '%s  %s\n' "$asset_digest" "$asset_name" | sha256sum -c - || exit 1
+    run_elevated install -m 0755 "$asset_name" /usr/local/bin/shfmt || exit $?
+  ) || status=$?
+  rm -rf "$tmp_dir"
+  return "$status"
+}
+
 install_pre_commit_uv_tool() {
   if ! have uv; then
     echo "uv is required to install pre-commit with the uv tool fallback." >&2
@@ -975,6 +1030,9 @@ install_github_release_tool() {
       ;;
     github-release:duckdb)
       install_duckdb_release
+      ;;
+    github-release:shfmt)
+      install_shfmt_release
       ;;
     *)
       echo "Unsupported GitHub release installer: $package" >&2

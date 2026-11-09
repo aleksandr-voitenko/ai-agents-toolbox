@@ -41,8 +41,10 @@ This conservative stance is the main project invariant.
   exceptions are missing `actionlint` and `typos` when apt, dnf, or zypper has
   no verified native package, missing `difftastic` on apt where Ubuntu's
   default repositories have no native package, missing `uv` on apt or zypper,
-  and missing `ast-grep` or `duckdb` on apt, dnf, or zypper. DuckDB's release
-  fallback supports x86-64/ARM64; pacman uses its native `duckdb` package.
+  missing `ast-grep` or `duckdb` on apt, dnf, or zypper, and missing `shfmt`
+  on DNF when the native install fails and the command is still absent.
+  DuckDB's release fallback supports x86-64/ARM64; pacman uses its native
+  `duckdb` package.
   The DuckDB fallback prefers current CLI tarballs and accepts legacy ZIP
   releases, with the same digest verification and failure handling for both.
   The script downloads the official GitHub release, verifies a checksum or
@@ -54,6 +56,11 @@ This conservative stance is the main project invariant.
   requests should use `GITHUB_TOKEN`
   when it is available, especially inside CI install-smoke containers, while
   still working anonymously for normal users when rate limits allow it.
+- The `shfmt` fallback uses official `mvdan/sh` release binaries for x86-64,
+  ARM64, 32-bit x86, or ARMv7. Unlike older release fallbacks, this path requires
+  `sha256sum` and a valid asset digest before installation to
+  `/usr/local/bin/shfmt`; downloaded binaries remain unmanaged. Fedora 45 lacks
+  the native package. Check-only mode must not query or download releases.
 - Treat source detection as best effort and label uncertain cases honestly.
   Default Unix `nvm` installs may report `nvm`, but they remain unmanaged for
   upgrade behavior.
